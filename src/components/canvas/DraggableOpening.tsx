@@ -70,25 +70,49 @@ const DraggableOpening = ({ opening, roomWidth, roomLength, roomHeight }: Dragga
     const point = e.point;
     if (!point) return;
 
+    // Determine which wall is closest based on drag position
+    const halfWidth = roomWidth / 2;
+    const halfLength = roomLength / 2;
+    
+    const distToNorth = Math.abs(point.z - (-halfLength));
+    const distToSouth = Math.abs(point.z - halfLength);
+    const distToWest = Math.abs(point.x - (-halfWidth));
+    const distToEast = Math.abs(point.x - halfWidth);
+    
+    const minDist = Math.min(distToNorth, distToSouth, distToWest, distToEast);
+    
+    let newWall: 'north' | 'south' | 'east' | 'west' = opening.wall;
     let newPosition: number;
-    const halfWidth = opening.width / 2;
+    const openingHalfWidth = opening.width / 2;
     const minMargin = 0.1;
 
-    if (wallInfo.dragAxis === 'x') {
-      // Clamp x position within wall bounds
-      const minX = -roomWidth / 2 + halfWidth + minMargin;
-      const maxX = roomWidth / 2 - halfWidth - minMargin;
-      const clampedX = Math.max(minX, Math.min(maxX, point.x));
-      newPosition = (clampedX / roomWidth) + 0.5;
+    if (minDist === distToNorth) {
+      newWall = 'north';
+      const minX = openingHalfWidth + minMargin;
+      const maxX = roomWidth - openingHalfWidth - minMargin;
+      const clampedX = Math.max(minX, Math.min(maxX, point.x + halfWidth));
+      newPosition = clampedX / roomWidth;
+    } else if (minDist === distToSouth) {
+      newWall = 'south';
+      const minX = openingHalfWidth + minMargin;
+      const maxX = roomWidth - openingHalfWidth - minMargin;
+      const clampedX = Math.max(minX, Math.min(maxX, point.x + halfWidth));
+      newPosition = clampedX / roomWidth;
+    } else if (minDist === distToWest) {
+      newWall = 'west';
+      const minZ = openingHalfWidth + minMargin;
+      const maxZ = roomLength - openingHalfWidth - minMargin;
+      const clampedZ = Math.max(minZ, Math.min(maxZ, point.z + halfLength));
+      newPosition = clampedZ / roomLength;
     } else {
-      // Clamp z position within wall bounds
-      const minZ = -roomLength / 2 + halfWidth + minMargin;
-      const maxZ = roomLength / 2 - halfWidth - minMargin;
-      const clampedZ = Math.max(minZ, Math.min(maxZ, point.z));
-      newPosition = (clampedZ / roomLength) + 0.5;
+      newWall = 'east';
+      const minZ = openingHalfWidth + minMargin;
+      const maxZ = roomLength - openingHalfWidth - minMargin;
+      const clampedZ = Math.max(minZ, Math.min(maxZ, point.z + halfLength));
+      newPosition = clampedZ / roomLength;
     }
 
-    updateOpening(opening.id, { position: newPosition });
+    updateOpening(opening.id, { wall: newWall, position: newPosition });
   };
 
   // Hover effect

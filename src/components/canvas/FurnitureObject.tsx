@@ -332,20 +332,41 @@ const FurnitureObject = ({ item, isSelected, onSelect, roomBounds }: FurnitureOb
     const halfWidth = roomBounds.width / 2 - margin;
     const halfLength = roomBounds.length / 2 - margin;
 
-    if (item.type === 'painting' && item.wall) {
-      // Drag along the wall
-      const paintingHeight = 1.5; // Default eye level
-      if (item.wall === 'north' || item.wall === 'south') {
-        const newX = Math.max(-halfWidth, Math.min(halfWidth, point.x));
-        updateFurniture(item.id, {
-          position: [newX, paintingHeight, item.position[2]],
-        });
+    if (item.type === 'painting') {
+      // Determine which wall is closest based on drag position
+      const distToNorth = Math.abs(point.z - (-roomBounds.length / 2));
+      const distToSouth = Math.abs(point.z - (roomBounds.length / 2));
+      const distToWest = Math.abs(point.x - (-roomBounds.width / 2));
+      const distToEast = Math.abs(point.x - (roomBounds.width / 2));
+      
+      const minDist = Math.min(distToNorth, distToSouth, distToWest, distToEast);
+      const paintingHeight = 1.5;
+      
+      let newWall: 'north' | 'south' | 'east' | 'west';
+      let newPosition: [number, number, number];
+
+      if (minDist === distToNorth) {
+        newWall = 'north';
+        const clampedX = Math.max(-halfWidth, Math.min(halfWidth, point.x));
+        newPosition = [clampedX, paintingHeight, 0];
+      } else if (minDist === distToSouth) {
+        newWall = 'south';
+        const clampedX = Math.max(-halfWidth, Math.min(halfWidth, point.x));
+        newPosition = [clampedX, paintingHeight, 0];
+      } else if (minDist === distToWest) {
+        newWall = 'west';
+        const clampedZ = Math.max(-halfLength, Math.min(halfLength, point.z));
+        newPosition = [0, paintingHeight, clampedZ];
       } else {
-        const newZ = Math.max(-halfLength, Math.min(halfLength, point.z));
-        updateFurniture(item.id, {
-          position: [item.position[0], paintingHeight, newZ],
-        });
+        newWall = 'east';
+        const clampedZ = Math.max(-halfLength, Math.min(halfLength, point.z));
+        newPosition = [0, paintingHeight, clampedZ];
       }
+
+      updateFurniture(item.id, {
+        position: newPosition,
+        wall: newWall,
+      });
     } else if (item.type === 'fan') {
       // Drag along ceiling
       const newX = Math.max(-halfWidth, Math.min(halfWidth, point.x));
