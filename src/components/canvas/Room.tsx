@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { useRoomStore, Opening } from '@/store/roomStore';
+import DraggableOpening from './DraggableOpening';
 import * as THREE from 'three';
 
 interface RoomProps {
@@ -103,77 +104,6 @@ const Room = ({ width, length, height }: RoomProps) => {
     });
   }, [width, length, height, openingsByWall]);
 
-  // Create door/window frames
-  const frames = useMemo(() => {
-    return openings.map((opening) => {
-      let wallWidth: number;
-      let position: [number, number, number];
-      let rotation: [number, number, number];
-
-      switch (opening.wall) {
-        case 'north':
-          wallWidth = width;
-          position = [(opening.position - 0.5) * wallWidth, opening.elevation + opening.height / 2, -length / 2];
-          rotation = [0, 0, 0];
-          break;
-        case 'south':
-          wallWidth = width;
-          position = [(opening.position - 0.5) * wallWidth, opening.elevation + opening.height / 2, length / 2];
-          rotation = [0, Math.PI, 0];
-          break;
-        case 'west':
-          wallWidth = length;
-          position = [-width / 2, opening.elevation + opening.height / 2, (opening.position - 0.5) * wallWidth];
-          rotation = [0, Math.PI / 2, 0];
-          break;
-        case 'east':
-          wallWidth = length;
-          position = [width / 2, opening.elevation + opening.height / 2, (opening.position - 0.5) * wallWidth];
-          rotation = [0, -Math.PI / 2, 0];
-          break;
-        default:
-          return null;
-      }
-
-      const frameColor = opening.type === 'door' ? '#5c4033' : '#4a5568';
-      const frameThickness = 0.04;
-
-      return (
-        <group key={opening.id} position={position} rotation={rotation}>
-          {/* Top frame */}
-          <mesh position={[0, opening.height / 2 + frameThickness / 2, 0]} castShadow>
-            <boxGeometry args={[opening.width + frameThickness * 2, frameThickness, 0.12]} />
-            <meshStandardMaterial color={frameColor} />
-          </mesh>
-          {/* Bottom frame (windows only) */}
-          {opening.type === 'window' && (
-            <mesh position={[0, -opening.height / 2 - frameThickness / 2, 0]} castShadow>
-              <boxGeometry args={[opening.width + frameThickness * 2, frameThickness, 0.12]} />
-              <meshStandardMaterial color={frameColor} />
-            </mesh>
-          )}
-          {/* Left frame */}
-          <mesh position={[-opening.width / 2 - frameThickness / 2, 0, 0]} castShadow>
-            <boxGeometry args={[frameThickness, opening.height, 0.12]} />
-            <meshStandardMaterial color={frameColor} />
-          </mesh>
-          {/* Right frame */}
-          <mesh position={[opening.width / 2 + frameThickness / 2, 0, 0]} castShadow>
-            <boxGeometry args={[frameThickness, opening.height, 0.12]} />
-            <meshStandardMaterial color={frameColor} />
-          </mesh>
-          {/* Glass for windows */}
-          {opening.type === 'window' && (
-            <mesh position={[0, 0, 0.01]}>
-              <planeGeometry args={[opening.width, opening.height]} />
-              <meshStandardMaterial color="#87ceeb" transparent opacity={0.25} side={THREE.DoubleSide} />
-            </mesh>
-          )}
-        </group>
-      );
-    });
-  }, [openings, width, length, height]);
-
   return (
     <group>
       {/* Floor */}
@@ -208,8 +138,16 @@ const Room = ({ width, length, height }: RoomProps) => {
         </mesh>
       ))}
 
-      {/* Door/Window frames */}
-      {frames}
+      {/* Draggable door/window frames */}
+      {openings.map((opening) => (
+        <DraggableOpening
+          key={opening.id}
+          opening={opening}
+          roomWidth={width}
+          roomLength={length}
+          roomHeight={height}
+        />
+      ))}
 
       {/* Ceiling edges */}
       <mesh position={[0, height, -length / 2]}>

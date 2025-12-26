@@ -90,7 +90,7 @@ const Scene = () => {
           item={item}
           isSelected={selectedFurnitureId === item.id}
           onSelect={() => selectFurniture(item.id)}
-          roomBounds={{ width, length }}
+          roomBounds={{ width, length, height }}
         />
       ))}
 

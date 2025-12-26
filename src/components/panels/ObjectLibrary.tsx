@@ -1,4 +1,4 @@
-import { useRoomStore, FurnitureItem } from '@/store/roomStore';
+import { useRoomStore, FurnitureItem, convertToMeters } from '@/store/roomStore';
 import { Button } from '@/components/ui/button';
 import { 
   Bed, 
@@ -7,6 +7,8 @@ import {
   ArmchairIcon, 
   DoorClosed,
   Flower2,
+  Frame,
+  Fan,
 } from 'lucide-react';
 
 const FURNITURE_CATALOG: {
@@ -21,20 +23,47 @@ const FURNITURE_CATALOG: {
   { type: 'chair', name: 'Chair', icon: ArmchairIcon, defaultColor: '#5a4a3a' },
   { type: 'wardrobe', name: 'Wardrobe', icon: DoorClosed, defaultColor: '#654321' },
   { type: 'decor', name: 'Decor', icon: Flower2, defaultColor: '#2d5a27' },
+  { type: 'painting', name: 'Painting', icon: Frame, defaultColor: '#4a6fa5' },
+  { type: 'fan', name: 'Ceiling Fan', icon: Fan, defaultColor: '#888888' },
 ];
 
 const ObjectLibrary = () => {
-  const addFurniture = useRoomStore((state) => state.addFurniture);
+  const { addFurniture, dimensions } = useRoomStore();
 
   const handleAddFurniture = (catalogItem: typeof FURNITURE_CATALOG[0]) => {
-    addFurniture({
-      type: catalogItem.type,
-      name: catalogItem.name,
-      position: [0, 0, 0], // On the floor
-      rotation: [0, 0, 0],
-      scale: [1, 1, 1],
-      color: catalogItem.defaultColor,
-    });
+    const height = dimensions ? convertToMeters(dimensions.height, dimensions.unit) : 2.5;
+    
+    if (catalogItem.type === 'painting') {
+      // Place painting on north wall at eye level
+      addFurniture({
+        type: catalogItem.type,
+        name: catalogItem.name,
+        position: [0, 1.5, 0], // Will be positioned by wall
+        rotation: [0, 0, 0],
+        scale: [1, 1, 1],
+        color: catalogItem.defaultColor,
+        wall: 'north',
+      });
+    } else if (catalogItem.type === 'fan') {
+      // Place fan on ceiling center
+      addFurniture({
+        type: catalogItem.type,
+        name: catalogItem.name,
+        position: [0, height - 0.4, 0],
+        rotation: [0, 0, 0],
+        scale: [1, 1, 1],
+        color: catalogItem.defaultColor,
+      });
+    } else {
+      addFurniture({
+        type: catalogItem.type,
+        name: catalogItem.name,
+        position: [0, 0, 0],
+        rotation: [0, 0, 0],
+        scale: [1, 1, 1],
+        color: catalogItem.defaultColor,
+      });
+    }
   };
 
   return (
@@ -60,7 +89,7 @@ const ObjectLibrary = () => {
 
       <div className="mt-6 px-1">
         <p className="text-xs text-muted-foreground">
-          Click to add furniture to your room. Drag to reposition.
+          Click to add furniture. Paintings go on walls, fans on ceiling.
         </p>
       </div>
     </div>

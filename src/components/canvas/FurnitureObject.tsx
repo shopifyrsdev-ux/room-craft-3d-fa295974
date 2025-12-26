@@ -7,7 +7,7 @@ interface FurnitureObjectProps {
   item: FurnitureItem;
   isSelected: boolean;
   onSelect: () => void;
-  roomBounds: { width: number; length: number };
+  roomBounds: { width: number; length: number; height: number };
 }
 
 // Realistic furniture components
@@ -191,6 +191,66 @@ const DecorModel = ({ color }: { color: string }) => {
   );
 };
 
+const PaintingModel = ({ color }: { color: string }) => {
+  return (
+    <group>
+      {/* Frame */}
+      <mesh castShadow>
+        <boxGeometry args={[0.8, 0.6, 0.05]} />
+        <meshStandardMaterial color="#4a3728" roughness={0.6} />
+      </mesh>
+      {/* Canvas */}
+      <mesh position={[0, 0, 0.03]}>
+        <boxGeometry args={[0.7, 0.5, 0.01]} />
+        <meshStandardMaterial color={color} roughness={0.8} />
+      </mesh>
+      {/* Inner border */}
+      <mesh position={[0, 0, 0.026]}>
+        <boxGeometry args={[0.72, 0.52, 0.005]} />
+        <meshStandardMaterial color="#f5f5dc" roughness={0.9} />
+      </mesh>
+    </group>
+  );
+};
+
+const FanModel = ({ color }: { color: string }) => {
+  return (
+    <group>
+      {/* Motor housing */}
+      <mesh position={[0, -0.1, 0]} castShadow>
+        <cylinderGeometry args={[0.12, 0.15, 0.2, 16]} />
+        <meshStandardMaterial color={color} metalness={0.6} roughness={0.3} />
+      </mesh>
+      {/* Mounting rod */}
+      <mesh position={[0, 0.15, 0]} castShadow>
+        <cylinderGeometry args={[0.02, 0.02, 0.5, 8]} />
+        <meshStandardMaterial color="#888888" metalness={0.8} roughness={0.2} />
+      </mesh>
+      {/* Ceiling mount */}
+      <mesh position={[0, 0.4, 0]} castShadow>
+        <cylinderGeometry args={[0.08, 0.08, 0.05, 16]} />
+        <meshStandardMaterial color="#888888" metalness={0.8} roughness={0.2} />
+      </mesh>
+      {/* Blades */}
+      {[0, 1, 2, 3, 4].map((i) => (
+        <mesh
+          key={i}
+          position={[
+            Math.cos((i * Math.PI * 2) / 5) * 0.4,
+            -0.15,
+            Math.sin((i * Math.PI * 2) / 5) * 0.4,
+          ]}
+          rotation={[0, -(i * Math.PI * 2) / 5, 0.1]}
+          castShadow
+        >
+          <boxGeometry args={[0.5, 0.02, 0.12]} />
+          <meshStandardMaterial color="#3d2817" roughness={0.6} />
+        </mesh>
+      ))}
+    </group>
+  );
+};
+
 const FURNITURE_MODELS: Record<FurnitureItem['type'], React.FC<{ color: string }>> = {
   bed: BedModel,
   sofa: SofaModel,
@@ -198,6 +258,8 @@ const FURNITURE_MODELS: Record<FurnitureItem['type'], React.FC<{ color: string }
   chair: ChairModel,
   wardrobe: WardrobeModel,
   decor: DecorModel,
+  painting: PaintingModel,
+  fan: FanModel,
 };
 
 const FurnitureObject = ({ item, isSelected, onSelect, roomBounds }: FurnitureObjectProps) => {
@@ -207,6 +269,47 @@ const FurnitureObject = ({ item, isSelected, onSelect, roomBounds }: FurnitureOb
   const [hovered, setHovered] = useState(false);
 
   const FurnitureModel = FURNITURE_MODELS[item.type];
+
+  // Get position and rotation for wall-mounted or ceiling items
+  const getItemTransform = () => {
+    if (item.type === 'painting' && item.wall) {
+      const wallOffset = 0.03;
+      switch (item.wall) {
+        case 'north':
+          return {
+            position: [item.position[0], item.position[1], -roomBounds.length / 2 + wallOffset] as [number, number, number],
+            rotation: [0, 0, 0] as [number, number, number],
+          };
+        case 'south':
+          return {
+            position: [item.position[0], item.position[1], roomBounds.length / 2 - wallOffset] as [number, number, number],
+            rotation: [0, Math.PI, 0] as [number, number, number],
+          };
+        case 'west':
+          return {
+            position: [-roomBounds.width / 2 + wallOffset, item.position[1], item.position[2]] as [number, number, number],
+            rotation: [0, Math.PI / 2, 0] as [number, number, number],
+          };
+        case 'east':
+          return {
+            position: [roomBounds.width / 2 - wallOffset, item.position[1], item.position[2]] as [number, number, number],
+            rotation: [0, -Math.PI / 2, 0] as [number, number, number],
+          };
+      }
+    }
+    if (item.type === 'fan') {
+      return {
+        position: [item.position[0], roomBounds.height - 0.4, item.position[2]] as [number, number, number],
+        rotation: item.rotation,
+      };
+    }
+    return {
+      position: item.position,
+      rotation: item.rotation,
+    };
+  };
+
+  const transform = getItemTransform();
 
   const handlePointerDown = (e: ThreeEvent<PointerEvent>) => {
     e.stopPropagation();
@@ -222,21 +325,42 @@ const FurnitureObject = ({ item, isSelected, onSelect, roomBounds }: FurnitureOb
     if (!isDragging) return;
     e.stopPropagation();
     
-    // Get intersection with floor plane
     const point = e.point;
     if (!point) return;
 
-    // Clamp within room bounds with margin
     const margin = 0.3;
     const halfWidth = roomBounds.width / 2 - margin;
     const halfLength = roomBounds.length / 2 - margin;
 
-    const newX = Math.max(-halfWidth, Math.min(halfWidth, point.x));
-    const newZ = Math.max(-halfLength, Math.min(halfLength, point.z));
-
-    updateFurniture(item.id, {
-      position: [newX, 0, newZ],
-    });
+    if (item.type === 'painting' && item.wall) {
+      // Drag along the wall
+      const paintingHeight = 1.5; // Default eye level
+      if (item.wall === 'north' || item.wall === 'south') {
+        const newX = Math.max(-halfWidth, Math.min(halfWidth, point.x));
+        updateFurniture(item.id, {
+          position: [newX, paintingHeight, item.position[2]],
+        });
+      } else {
+        const newZ = Math.max(-halfLength, Math.min(halfLength, point.z));
+        updateFurniture(item.id, {
+          position: [item.position[0], paintingHeight, newZ],
+        });
+      }
+    } else if (item.type === 'fan') {
+      // Drag along ceiling
+      const newX = Math.max(-halfWidth, Math.min(halfWidth, point.x));
+      const newZ = Math.max(-halfLength, Math.min(halfLength, point.z));
+      updateFurniture(item.id, {
+        position: [newX, item.position[1], newZ],
+      });
+    } else {
+      // Regular floor furniture
+      const newX = Math.max(-halfWidth, Math.min(halfWidth, point.x));
+      const newZ = Math.max(-halfLength, Math.min(halfLength, point.z));
+      updateFurniture(item.id, {
+        position: [newX, 0, newZ],
+      });
+    }
   };
 
   // Hover effect
@@ -246,11 +370,37 @@ const FurnitureObject = ({ item, isSelected, onSelect, roomBounds }: FurnitureOb
     groupRef.current.scale.lerp(new THREE.Vector3(targetScale, targetScale, targetScale), 0.1);
   });
 
+  // Selection indicator position based on item type
+  const getSelectionIndicator = () => {
+    if (item.type === 'painting') {
+      return (
+        <mesh position={[0, 0, 0.08]}>
+          <ringGeometry args={[0.5, 0.55, 32]} />
+          <meshBasicMaterial color="#f59e0b" transparent opacity={0.6} />
+        </mesh>
+      );
+    }
+    if (item.type === 'fan') {
+      return (
+        <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, 0.3, 0]}>
+          <ringGeometry args={[0.5, 0.55, 32]} />
+          <meshBasicMaterial color="#f59e0b" transparent opacity={0.6} />
+        </mesh>
+      );
+    }
+    return (
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]}>
+        <ringGeometry args={[0.8, 0.9, 32]} />
+        <meshBasicMaterial color="#f59e0b" transparent opacity={0.6} />
+      </mesh>
+    );
+  };
+
   return (
     <group 
       ref={groupRef}
-      position={item.position} 
-      rotation={item.rotation}
+      position={transform.position} 
+      rotation={transform.rotation}
       onPointerDown={handlePointerDown}
       onPointerUp={handlePointerUp}
       onPointerMove={handlePointerMove}
@@ -267,13 +417,8 @@ const FurnitureObject = ({ item, isSelected, onSelect, roomBounds }: FurnitureOb
     >
       <FurnitureModel color={item.color} />
       
-      {/* Selection indicator - glowing ring on floor */}
-      {isSelected && (
-        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]}>
-          <ringGeometry args={[0.8, 0.9, 32]} />
-          <meshBasicMaterial color="#f59e0b" transparent opacity={0.6} />
-        </mesh>
-      )}
+      {/* Selection indicator */}
+      {isSelected && getSelectionIndicator()}
     </group>
   );
 };

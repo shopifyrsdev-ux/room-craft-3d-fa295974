@@ -22,12 +22,13 @@ export interface RoomDimensions {
 
 export interface FurnitureItem {
   id: string;
-  type: 'bed' | 'sofa' | 'table' | 'chair' | 'wardrobe' | 'decor';
+  type: 'bed' | 'sofa' | 'table' | 'chair' | 'wardrobe' | 'decor' | 'painting' | 'fan';
   name: string;
   position: [number, number, number];
   rotation: [number, number, number];
   scale: [number, number, number];
   color: string;
+  wall?: 'north' | 'south' | 'east' | 'west'; // For wall-mounted items like paintings
 }
 
 export interface WallColors {
