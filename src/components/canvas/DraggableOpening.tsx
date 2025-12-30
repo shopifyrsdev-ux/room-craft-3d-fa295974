@@ -1,5 +1,5 @@
-import { useState, useRef } from 'react';
-import { ThreeEvent, useFrame } from '@react-three/fiber';
+import { useState, useRef, useMemo, useCallback } from 'react';
+import { ThreeEvent } from '@react-three/fiber';
 import { useRoomStore, Opening } from '@/store/roomStore';
 import * as THREE from 'three';
 
@@ -15,9 +15,11 @@ const DraggableOpening = ({ opening, roomWidth, roomLength, roomHeight }: Dragga
   const [isDragging, setIsDragging] = useState(false);
   const [hovered, setHovered] = useState(false);
   const groupRef = useRef<THREE.Group>(null);
+  const lastUpdateRef = useRef<number>(0);
+  const throttleMs = 16;
 
-  // Calculate wall dimensions and position based on wall type
-  const getWallInfo = () => {
+  // Memoize wall info calculation
+  const wallInfo = useMemo(() => {
     switch (opening.wall) {
       case 'north':
         return {
@@ -48,29 +50,43 @@ const DraggableOpening = ({ opening, roomWidth, roomLength, roomHeight }: Dragga
           dragAxis: 'z' as const,
         };
     }
-  };
+  }, [opening.wall, opening.position, opening.elevation, opening.height, roomWidth, roomLength]);
 
-  const wallInfo = getWallInfo();
   const frameColor = opening.type === 'door' ? '#5c4033' : '#4a5568';
   const frameThickness = 0.04;
 
-  const handlePointerDown = (e: ThreeEvent<PointerEvent>) => {
+  // Memoize materials
+  const materials = useMemo(() => ({
+    frame: new THREE.MeshStandardMaterial({ color: frameColor }),
+    glass: new THREE.MeshStandardMaterial({ color: "#87ceeb", transparent: true, opacity: 0.25, side: THREE.DoubleSide }),
+    door: new THREE.MeshStandardMaterial({ color: "#8b6914", roughness: 0.7 }),
+    indicator: new THREE.MeshBasicMaterial({ color: "#f59e0b", transparent: true, opacity: 0.8 }),
+  }), [frameColor]);
+
+  const handlePointerDown = useCallback((e: ThreeEvent<PointerEvent>) => {
     e.stopPropagation();
     setIsDragging(true);
-  };
+    document.body.style.cursor = 'grabbing';
+  }, []);
 
-  const handlePointerUp = () => {
+  const handlePointerUp = useCallback(() => {
     setIsDragging(false);
-  };
+    document.body.style.cursor = 'auto';
+  }, []);
 
-  const handlePointerMove = (e: ThreeEvent<PointerEvent>) => {
+  const handlePointerMove = useCallback((e: ThreeEvent<PointerEvent>) => {
     if (!isDragging) return;
+    
+    // Throttle updates
+    const now = performance.now();
+    if (now - lastUpdateRef.current < throttleMs) return;
+    lastUpdateRef.current = now;
+    
     e.stopPropagation();
 
     const point = e.point;
     if (!point) return;
 
-    // Determine which wall is closest based on drag position
     const halfWidth = roomWidth / 2;
     const halfLength = roomLength / 2;
     
@@ -90,43 +106,35 @@ const DraggableOpening = ({ opening, roomWidth, roomLength, roomHeight }: Dragga
       newWall = 'north';
       const minX = openingHalfWidth + minMargin;
       const maxX = roomWidth - openingHalfWidth - minMargin;
-      const clampedX = Math.max(minX, Math.min(maxX, point.x + halfWidth));
-      newPosition = clampedX / roomWidth;
+      newPosition = Math.max(minX, Math.min(maxX, point.x + halfWidth)) / roomWidth;
     } else if (minDist === distToSouth) {
       newWall = 'south';
       const minX = openingHalfWidth + minMargin;
       const maxX = roomWidth - openingHalfWidth - minMargin;
-      const clampedX = Math.max(minX, Math.min(maxX, point.x + halfWidth));
-      newPosition = clampedX / roomWidth;
+      newPosition = Math.max(minX, Math.min(maxX, point.x + halfWidth)) / roomWidth;
     } else if (minDist === distToWest) {
       newWall = 'west';
       const minZ = openingHalfWidth + minMargin;
       const maxZ = roomLength - openingHalfWidth - minMargin;
-      const clampedZ = Math.max(minZ, Math.min(maxZ, point.z + halfLength));
-      newPosition = clampedZ / roomLength;
+      newPosition = Math.max(minZ, Math.min(maxZ, point.z + halfLength)) / roomLength;
     } else {
       newWall = 'east';
       const minZ = openingHalfWidth + minMargin;
       const maxZ = roomLength - openingHalfWidth - minMargin;
-      const clampedZ = Math.max(minZ, Math.min(maxZ, point.z + halfLength));
-      newPosition = clampedZ / roomLength;
+      newPosition = Math.max(minZ, Math.min(maxZ, point.z + halfLength)) / roomLength;
     }
 
     updateOpening(opening.id, { wall: newWall, position: newPosition });
-  };
+  }, [isDragging, opening.id, opening.wall, opening.width, roomWidth, roomLength, updateOpening, throttleMs]);
 
-  // Hover effect
-  useFrame(() => {
-    if (!groupRef.current) return;
-    const targetScale = hovered || isDragging ? 1.03 : 1;
-    groupRef.current.scale.lerp(new THREE.Vector3(targetScale, targetScale, targetScale), 0.1);
-  });
+  const scale = (hovered || isDragging) ? 1.03 : 1;
 
   return (
     <group
       ref={groupRef}
       position={wallInfo.position}
       rotation={wallInfo.rotation}
+      scale={[scale, scale, scale]}
       onPointerDown={handlePointerDown}
       onPointerUp={handlePointerUp}
       onPointerMove={handlePointerMove}
@@ -137,57 +145,51 @@ const DraggableOpening = ({ opening, roomWidth, roomLength, roomHeight }: Dragga
       }}
       onPointerOut={() => {
         setHovered(false);
-        setIsDragging(false);
-        document.body.style.cursor = 'auto';
+        if (!isDragging) {
+          document.body.style.cursor = 'auto';
+        }
       }}
     >
       {/* Top frame */}
-      <mesh position={[0, opening.height / 2 + frameThickness / 2, 0]} castShadow>
+      <mesh position={[0, opening.height / 2 + frameThickness / 2, 0]} castShadow material={materials.frame}>
         <boxGeometry args={[opening.width + frameThickness * 2, frameThickness, 0.12]} />
-        <meshStandardMaterial color={frameColor} />
       </mesh>
       
       {/* Bottom frame (windows only) */}
       {opening.type === 'window' && (
-        <mesh position={[0, -opening.height / 2 - frameThickness / 2, 0]} castShadow>
+        <mesh position={[0, -opening.height / 2 - frameThickness / 2, 0]} castShadow material={materials.frame}>
           <boxGeometry args={[opening.width + frameThickness * 2, frameThickness, 0.12]} />
-          <meshStandardMaterial color={frameColor} />
         </mesh>
       )}
       
       {/* Left frame */}
-      <mesh position={[-opening.width / 2 - frameThickness / 2, 0, 0]} castShadow>
+      <mesh position={[-opening.width / 2 - frameThickness / 2, 0, 0]} castShadow material={materials.frame}>
         <boxGeometry args={[frameThickness, opening.height, 0.12]} />
-        <meshStandardMaterial color={frameColor} />
       </mesh>
       
       {/* Right frame */}
-      <mesh position={[opening.width / 2 + frameThickness / 2, 0, 0]} castShadow>
+      <mesh position={[opening.width / 2 + frameThickness / 2, 0, 0]} castShadow material={materials.frame}>
         <boxGeometry args={[frameThickness, opening.height, 0.12]} />
-        <meshStandardMaterial color={frameColor} />
       </mesh>
       
       {/* Glass for windows */}
       {opening.type === 'window' && (
-        <mesh position={[0, 0, 0.01]}>
+        <mesh position={[0, 0, 0.01]} material={materials.glass}>
           <planeGeometry args={[opening.width, opening.height]} />
-          <meshStandardMaterial color="#87ceeb" transparent opacity={0.25} side={THREE.DoubleSide} />
         </mesh>
       )}
 
       {/* Door panel */}
       {opening.type === 'door' && (
-        <mesh position={[0, 0, 0.02]}>
+        <mesh position={[0, 0, 0.02]} material={materials.door}>
           <boxGeometry args={[opening.width - 0.02, opening.height - 0.02, 0.04]} />
-          <meshStandardMaterial color="#8b6914" roughness={0.7} />
         </mesh>
       )}
 
       {/* Drag indicator when hovered */}
       {(hovered || isDragging) && (
-        <mesh position={[0, 0, 0.1]}>
+        <mesh position={[0, 0, 0.1]} material={materials.indicator}>
           <ringGeometry args={[0.12, 0.15, 16]} />
-          <meshBasicMaterial color="#f59e0b" transparent opacity={0.8} />
         </mesh>
       )}
     </group>
