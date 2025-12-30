@@ -30,6 +30,24 @@ export interface RoomDimensions {
   unit: Unit;
 }
 
+export interface FurnitureDimensions {
+  width: number;  // x-axis
+  height: number; // y-axis
+  depth: number;  // z-axis
+}
+
+// Default dimensions for each furniture type (in meters)
+export const DEFAULT_FURNITURE_DIMENSIONS: Record<string, FurnitureDimensions> = {
+  bed: { width: 1.6, height: 1.0, depth: 2.0 },
+  sofa: { width: 2.0, height: 0.8, depth: 0.85 },
+  table: { width: 1.2, height: 0.75, depth: 0.8 },
+  chair: { width: 0.45, height: 1.0, depth: 0.45 },
+  wardrobe: { width: 1.5, height: 2.0, depth: 0.6 },
+  decor: { width: 0.3, height: 0.6, depth: 0.3 },
+  painting: { width: 0.8, height: 0.6, depth: 0.05 },
+  fan: { width: 1.0, height: 0.5, depth: 1.0 },
+};
+
 export interface FurnitureItem {
   id: string;
   type: 'bed' | 'sofa' | 'table' | 'chair' | 'wardrobe' | 'decor' | 'painting' | 'fan';
@@ -39,6 +57,8 @@ export interface FurnitureItem {
   scale: [number, number, number];
   color: string;
   wall?: 'north' | 'south' | 'east' | 'west'; // For wall-mounted items like paintings
+  useCustomDimensions?: boolean;
+  customDimensions?: FurnitureDimensions;
 }
 
 export type WallTexture = 'none' | 'brick' | 'wood' | 'wallpaper-stripe' | 'wallpaper-damask' | 'concrete';
