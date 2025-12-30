@@ -1,6 +1,6 @@
 import { useRef, useState, useMemo, useCallback } from 'react';
 import { ThreeEvent } from '@react-three/fiber';
-import { useRoomStore, FurnitureItem } from '@/store/roomStore';
+import { useRoomStore, FurnitureItem, DEFAULT_FURNITURE_DIMENSIONS } from '@/store/roomStore';
 import * as THREE from 'three';
 
 interface FurnitureObjectProps {
@@ -396,15 +396,33 @@ const FurnitureObject = ({ item, isSelected, onSelect, roomBounds }: FurnitureOb
     );
   }, [item.type, selectionMaterial]);
 
+  // Calculate scale based on custom dimensions
+  const dimensionScale = useMemo(() => {
+    const defaultDims = DEFAULT_FURNITURE_DIMENSIONS[item.type];
+    if (item.useCustomDimensions && item.customDimensions) {
+      return [
+        item.customDimensions.width / defaultDims.width,
+        item.customDimensions.height / defaultDims.height,
+        item.customDimensions.depth / defaultDims.depth,
+      ] as [number, number, number];
+    }
+    return [1, 1, 1] as [number, number, number];
+  }, [item.type, item.useCustomDimensions, item.customDimensions]);
+
   // Scale for hover/selection effect - applied directly without useFrame
-  const scale = isSelected ? 1.02 : 1;
+  const baseScale = isSelected ? 1.02 : 1;
+  const finalScale: [number, number, number] = [
+    dimensionScale[0] * baseScale,
+    dimensionScale[1] * baseScale,
+    dimensionScale[2] * baseScale,
+  ];
 
   return (
     <group 
       ref={groupRef}
       position={transform?.position} 
       rotation={transform?.rotation}
-      scale={[scale, scale, scale]}
+      scale={finalScale}
       onPointerDown={handlePointerDown}
       onPointerUp={handlePointerUp}
       onPointerMove={handlePointerMove}

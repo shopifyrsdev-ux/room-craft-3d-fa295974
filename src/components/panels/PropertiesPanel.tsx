@@ -1,8 +1,9 @@
-import { useRoomStore, FurnitureItem, WallColors, WallTextures, WallTexture } from '@/store/roomStore';
+import { useRoomStore, FurnitureItem, WallColors, WallTextures, WallTexture, DEFAULT_FURNITURE_DIMENSIONS, FurnitureDimensions } from '@/store/roomStore';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { Trash2, RotateCw } from 'lucide-react';
 import { TEXTURE_OPTIONS } from '@/lib/wallTextures';
 
@@ -49,6 +50,33 @@ const PropertiesPanel = () => {
     updateFurniture(selectedItem.id, { color });
   };
 
+  const handleToggleCustomDimensions = (checked: boolean) => {
+    if (!selectedItem) return;
+    const defaultDims = DEFAULT_FURNITURE_DIMENSIONS[selectedItem.type];
+    updateFurniture(selectedItem.id, { 
+      useCustomDimensions: checked,
+      customDimensions: checked ? (selectedItem.customDimensions || defaultDims) : undefined
+    });
+  };
+
+  const handleDimensionChange = (axis: keyof FurnitureDimensions, value: string) => {
+    if (!selectedItem) return;
+    const numValue = parseFloat(value) || 0.1;
+    const defaultDims = DEFAULT_FURNITURE_DIMENSIONS[selectedItem.type];
+    const currentDims = selectedItem.customDimensions || defaultDims;
+    updateFurniture(selectedItem.id, {
+      customDimensions: { ...currentDims, [axis]: Math.max(0.1, Math.min(10, numValue)) }
+    });
+  };
+
+  const getDisplayDimensions = (): FurnitureDimensions | null => {
+    if (!selectedItem) return null;
+    if (selectedItem.useCustomDimensions && selectedItem.customDimensions) {
+      return selectedItem.customDimensions;
+    }
+    return DEFAULT_FURNITURE_DIMENSIONS[selectedItem.type];
+  };
+
   return (
     <div className="glass-panel p-4 w-72 h-full overflow-y-auto">
       <h2 className="font-display text-lg font-semibold mb-4 px-1">Properties</h2>
@@ -78,6 +106,70 @@ const PropertiesPanel = () => {
                 </Button>
               </div>
             </div>
+          </div>
+
+          {/* Custom Dimensions */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label className="text-sm">Custom Dimensions</Label>
+              <Switch
+                checked={selectedItem.useCustomDimensions || false}
+                onCheckedChange={handleToggleCustomDimensions}
+              />
+            </div>
+            
+            {(() => {
+              const dims = getDisplayDimensions();
+              if (!dims) return null;
+              return (
+                <div className="space-y-2">
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Width (m)</Label>
+                      <Input
+                        type="number"
+                        step="0.1"
+                        min="0.1"
+                        max="10"
+                        value={dims.width}
+                        onChange={(e) => handleDimensionChange('width', e.target.value)}
+                        disabled={!selectedItem.useCustomDimensions}
+                        className="h-8"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Height (m)</Label>
+                      <Input
+                        type="number"
+                        step="0.1"
+                        min="0.1"
+                        max="10"
+                        value={dims.height}
+                        onChange={(e) => handleDimensionChange('height', e.target.value)}
+                        disabled={!selectedItem.useCustomDimensions}
+                        className="h-8"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Depth (m)</Label>
+                      <Input
+                        type="number"
+                        step="0.1"
+                        min="0.1"
+                        max="10"
+                        value={dims.depth}
+                        onChange={(e) => handleDimensionChange('depth', e.target.value)}
+                        disabled={!selectedItem.useCustomDimensions}
+                        className="h-8"
+                      />
+                    </div>
+                  </div>
+                  {!selectedItem.useCustomDimensions && (
+                    <p className="text-xs text-muted-foreground">Enable to customize</p>
+                  )}
+                </div>
+              );
+            })()}
           </div>
 
           {/* Object Color */}
