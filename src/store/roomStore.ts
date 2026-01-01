@@ -77,6 +77,17 @@ export interface WallTextures {
   west: WallTexture;
 }
 
+// Snapshot for undo/redo
+interface HistorySnapshot {
+  dimensions: RoomDimensions | null;
+  openings: Opening[];
+  furniture: FurnitureItem[];
+  wallColors: WallColors;
+  wallTextures: WallTextures;
+  floorColor: string;
+  ceilingColor: string;
+}
+
 export interface RoomState {
   // Room setup
   dimensions: RoomDimensions | null;
@@ -116,10 +127,15 @@ export interface RoomState {
   resetRoom: () => void;
   loadDesign: (data: DesignData) => void;
   getDesignData: () => DesignData;
+  
+  // Undo/Redo
+  history: HistorySnapshot[];
+  historyIndex: number;
+  saveToHistory: () => void;
   undo: () => void;
   redo: () => void;
-  history: RoomState[];
-  historyIndex: number;
+  canUndo: () => boolean;
+  canRedo: () => boolean;
 }
 
 const defaultWallColors: WallColors = {
@@ -136,82 +152,131 @@ const defaultWallTextures: WallTextures = {
   west: 'none',
 };
 
+const MAX_HISTORY = 50;
+
+const createSnapshot = (state: RoomState): HistorySnapshot => ({
+  dimensions: state.dimensions ? { ...state.dimensions } : null,
+  openings: JSON.parse(JSON.stringify(state.openings)),
+  furniture: JSON.parse(JSON.stringify(state.furniture)),
+  wallColors: { ...state.wallColors },
+  wallTextures: { ...state.wallTextures },
+  floorColor: state.floorColor,
+  ceilingColor: state.ceilingColor,
+});
+
 export const useRoomStore = create<RoomState>()(
   persist(
     (set, get) => ({
       dimensions: null,
-      setDimensions: (dimensions) => set({ dimensions }),
+      setDimensions: (dimensions) => {
+        get().saveToHistory();
+        set({ dimensions });
+      },
       
       openings: [],
-      addOpening: (opening) => set((state) => ({
-        openings: [...state.openings, opening],
-      })),
-      updateOpening: (id, updates) => set((state) => ({
-        openings: state.openings.map((o) =>
-          o.id === id ? { ...o, ...updates } : o
-        ),
-      })),
-      removeOpening: (id) => set((state) => ({
-        openings: state.openings.filter((o) => o.id !== id),
-      })),
+      addOpening: (opening) => {
+        get().saveToHistory();
+        set((state) => ({
+          openings: [...state.openings, opening],
+        }));
+      },
+      updateOpening: (id, updates) => {
+        get().saveToHistory();
+        set((state) => ({
+          openings: state.openings.map((o) =>
+            o.id === id ? { ...o, ...updates } : o
+          ),
+        }));
+      },
+      removeOpening: (id) => {
+        get().saveToHistory();
+        set((state) => ({
+          openings: state.openings.filter((o) => o.id !== id),
+        }));
+      },
       
       furniture: [],
-      addFurniture: (item) => set((state) => ({
-        furniture: [...state.furniture, { ...item, id: crypto.randomUUID() }],
-      })),
-      updateFurniture: (id, updates) => set((state) => ({
-        furniture: state.furniture.map((item) =>
-          item.id === id ? { ...item, ...updates } : item
-        ),
-      })),
-      removeFurniture: (id) => set((state) => ({
-        furniture: state.furniture.filter((item) => item.id !== id),
-        selectedFurnitureId: state.selectedFurnitureId === id ? null : state.selectedFurnitureId,
-      })),
+      addFurniture: (item) => {
+        get().saveToHistory();
+        set((state) => ({
+          furniture: [...state.furniture, { ...item, id: crypto.randomUUID() }],
+        }));
+      },
+      updateFurniture: (id, updates) => {
+        // Don't save to history for position updates (too frequent during drag)
+        set((state) => ({
+          furniture: state.furniture.map((item) =>
+            item.id === id ? { ...item, ...updates } : item
+          ),
+        }));
+      },
+      removeFurniture: (id) => {
+        get().saveToHistory();
+        set((state) => ({
+          furniture: state.furniture.filter((item) => item.id !== id),
+          selectedFurnitureId: state.selectedFurnitureId === id ? null : state.selectedFurnitureId,
+        }));
+      },
       selectedFurnitureId: null,
       selectFurniture: (id) => set({ selectedFurnitureId: id }),
       
       wallColors: defaultWallColors,
-      setWallColor: (wall, color) => set((state) => ({
-        wallColors: { ...state.wallColors, [wall]: color },
-      })),
+      setWallColor: (wall, color) => {
+        get().saveToHistory();
+        set((state) => ({
+          wallColors: { ...state.wallColors, [wall]: color },
+        }));
+      },
       wallTextures: defaultWallTextures,
-      setWallTexture: (wall, texture) => set((state) => ({
-        wallTextures: { ...state.wallTextures, [wall]: texture },
-      })),
+      setWallTexture: (wall, texture) => {
+        get().saveToHistory();
+        set((state) => ({
+          wallTextures: { ...state.wallTextures, [wall]: texture },
+        }));
+      },
       floorColor: '#8b7355',
-      setFloorColor: (floorColor) => set({ floorColor }),
+      setFloorColor: (floorColor) => {
+        get().saveToHistory();
+        set({ floorColor });
+      },
       ceilingColor: '#ffffff',
-      setCeilingColor: (ceilingColor) => set({ ceilingColor }),
+      setCeilingColor: (ceilingColor) => {
+        get().saveToHistory();
+        set({ ceilingColor });
+      },
       
       showGrid: true,
       toggleGrid: () => set((state) => ({ showGrid: !state.showGrid })),
       cameraLocked: false,
       toggleCameraLock: () => set((state) => ({ cameraLocked: !state.cameraLocked })),
       
-      resetRoom: () => set({
-        dimensions: null,
-        openings: [],
-        furniture: [],
-        selectedFurnitureId: null,
-        wallColors: defaultWallColors,
-        wallTextures: defaultWallTextures,
-        floorColor: '#8b7355',
-        ceilingColor: '#ffffff',
-        showGrid: true,
-        cameraLocked: false,
-      }),
+      // Reset keeps dimensions but clears everything else
+      resetRoom: () => {
+        get().saveToHistory();
+        set((state) => ({
+          openings: [],
+          furniture: [],
+          selectedFurnitureId: null,
+          wallColors: defaultWallColors,
+          wallTextures: defaultWallTextures,
+          floorColor: '#8b7355',
+          ceilingColor: '#ffffff',
+        }));
+      },
       
-      loadDesign: (data) => set({
-        dimensions: data.dimensions,
-        openings: data.openings,
-        furniture: data.furniture,
-        wallColors: data.wallColors,
-        wallTextures: data.wallTextures,
-        floorColor: data.floorColor,
-        ceilingColor: data.ceilingColor,
-        selectedFurnitureId: null,
-      }),
+      loadDesign: (data) => {
+        get().saveToHistory();
+        set({
+          dimensions: data.dimensions,
+          openings: data.openings,
+          furniture: data.furniture,
+          wallColors: data.wallColors,
+          wallTextures: data.wallTextures,
+          floorColor: data.floorColor,
+          ceilingColor: data.ceilingColor,
+          selectedFurnitureId: null,
+        });
+      },
 
       getDesignData: () => {
         const state = get();
@@ -226,11 +291,73 @@ export const useRoomStore = create<RoomState>()(
         };
       },
       
-      // Placeholder for undo/redo - simplified for MVP
-      undo: () => {},
-      redo: () => {},
+      // Undo/Redo implementation
       history: [],
       historyIndex: -1,
+      
+      saveToHistory: () => {
+        const state = get();
+        const snapshot = createSnapshot(state);
+        const newHistory = state.history.slice(0, state.historyIndex + 1);
+        newHistory.push(snapshot);
+        
+        // Limit history size
+        if (newHistory.length > MAX_HISTORY) {
+          newHistory.shift();
+        }
+        
+        set({
+          history: newHistory,
+          historyIndex: newHistory.length - 1,
+        });
+      },
+      
+      undo: () => {
+        const state = get();
+        if (state.historyIndex < 0) return;
+        
+        const snapshot = state.history[state.historyIndex];
+        set({
+          dimensions: snapshot.dimensions,
+          openings: snapshot.openings,
+          furniture: snapshot.furniture,
+          wallColors: snapshot.wallColors,
+          wallTextures: snapshot.wallTextures,
+          floorColor: snapshot.floorColor,
+          ceilingColor: snapshot.ceilingColor,
+          historyIndex: state.historyIndex - 1,
+          selectedFurnitureId: null,
+        });
+      },
+      
+      redo: () => {
+        const state = get();
+        if (state.historyIndex >= state.history.length - 1) return;
+        
+        const nextIndex = state.historyIndex + 1;
+        const snapshot = state.history[nextIndex];
+        
+        // For redo, we need to look at the NEXT state after snapshot
+        // Since snapshot represents state BEFORE the action, redo should apply the action
+        // But our history stores pre-action states, so redo goes to index+1 and applies that post state
+        if (nextIndex + 1 < state.history.length) {
+          const nextSnapshot = state.history[nextIndex + 1];
+          set({
+            dimensions: nextSnapshot.dimensions,
+            openings: nextSnapshot.openings,
+            furniture: nextSnapshot.furniture,
+            wallColors: nextSnapshot.wallColors,
+            wallTextures: nextSnapshot.wallTextures,
+            floorColor: nextSnapshot.floorColor,
+            ceilingColor: nextSnapshot.ceilingColor,
+            historyIndex: nextIndex + 1,
+            selectedFurnitureId: null,
+          });
+        }
+      },
+      
+      canUndo: () => get().historyIndex >= 0,
+      canRedo: () => get().historyIndex < get().history.length - 2,
     }),
     {
       name: 'room-designer-storage',
