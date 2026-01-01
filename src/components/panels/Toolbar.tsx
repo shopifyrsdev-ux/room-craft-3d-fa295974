@@ -37,6 +37,10 @@ const Toolbar = ({ onExit }: ToolbarProps) => {
     dimensions,
     getDesignData,
     loadDesign,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
   } = useRoomStore();
 
   const { user, signOut } = useAuth();
@@ -136,11 +140,25 @@ const Toolbar = ({ onExit }: ToolbarProps) => {
 
         <div className="h-6 w-px bg-border" />
 
-        {/* Undo/Redo (placeholder for now) */}
-        <Button variant="ghost" size="icon" disabled className="h-8 w-8">
+        {/* Undo/Redo */}
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          disabled={!canUndo()} 
+          onClick={undo}
+          className="h-8 w-8"
+          title="Undo (Ctrl+Z)"
+        >
           <Undo2 className="w-4 h-4" />
         </Button>
-        <Button variant="ghost" size="icon" disabled className="h-8 w-8">
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          disabled={!canRedo()} 
+          onClick={redo}
+          className="h-8 w-8"
+          title="Redo (Ctrl+Y)"
+        >
           <Redo2 className="w-4 h-4" />
         </Button>
 
