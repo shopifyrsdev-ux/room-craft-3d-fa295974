@@ -3,6 +3,16 @@ import { persist } from 'zustand/middleware';
 
 export type Unit = 'meters' | 'feet';
 
+export type AttachableWall = 'north' | 'south' | 'east' | 'west';
+
+export interface AttachedRoom {
+  type: 'bathroom' | 'kitchen';
+  wall: AttachableWall;
+  width: number;  // perpendicular to attached wall
+  length: number; // parallel to attached wall
+  height: number;
+}
+
 export interface DesignData {
   dimensions: RoomDimensions | null;
   openings: Opening[];
@@ -11,6 +21,7 @@ export interface DesignData {
   wallTextures: WallTextures;
   floorColor: string;
   ceilingColor: string;
+  attachedRooms: AttachedRoom[];
 }
 
 export interface Opening {
@@ -86,6 +97,7 @@ interface HistorySnapshot {
   wallTextures: WallTextures;
   floorColor: string;
   ceilingColor: string;
+  attachedRooms: AttachedRoom[];
 }
 
 export interface RoomState {
@@ -106,6 +118,12 @@ export interface RoomState {
   removeFurniture: (id: string) => void;
   selectedFurnitureId: string | null;
   selectFurniture: (id: string | null) => void;
+  
+  // Attached rooms (bathroom/kitchen)
+  attachedRooms: AttachedRoom[];
+  addAttachedRoom: (room: AttachedRoom) => void;
+  updateAttachedRoom: (type: AttachedRoom['type'], updates: Partial<AttachedRoom>) => void;
+  removeAttachedRoom: (type: AttachedRoom['type']) => void;
   
   // Colors
   wallColors: WallColors;
@@ -162,6 +180,7 @@ const createSnapshot = (state: RoomState): HistorySnapshot => ({
   wallTextures: { ...state.wallTextures },
   floorColor: state.floorColor,
   ceilingColor: state.ceilingColor,
+  attachedRooms: JSON.parse(JSON.stringify(state.attachedRooms)),
 });
 
 export const useRoomStore = create<RoomState>()(
@@ -220,6 +239,29 @@ export const useRoomStore = create<RoomState>()(
       selectedFurnitureId: null,
       selectFurniture: (id) => set({ selectedFurnitureId: id }),
       
+      // Attached rooms
+      attachedRooms: [],
+      addAttachedRoom: (room) => {
+        get().saveToHistory();
+        set((state) => ({
+          attachedRooms: [...state.attachedRooms.filter(r => r.type !== room.type), room],
+        }));
+      },
+      updateAttachedRoom: (type, updates) => {
+        get().saveToHistory();
+        set((state) => ({
+          attachedRooms: state.attachedRooms.map((r) =>
+            r.type === type ? { ...r, ...updates } : r
+          ),
+        }));
+      },
+      removeAttachedRoom: (type) => {
+        get().saveToHistory();
+        set((state) => ({
+          attachedRooms: state.attachedRooms.filter((r) => r.type !== type),
+        }));
+      },
+      
       wallColors: defaultWallColors,
       setWallColor: (wall, color) => {
         get().saveToHistory();
@@ -256,6 +298,7 @@ export const useRoomStore = create<RoomState>()(
         set((state) => ({
           openings: [],
           furniture: [],
+          attachedRooms: [],
           selectedFurnitureId: null,
           wallColors: defaultWallColors,
           wallTextures: defaultWallTextures,
@@ -274,6 +317,7 @@ export const useRoomStore = create<RoomState>()(
           wallTextures: data.wallTextures,
           floorColor: data.floorColor,
           ceilingColor: data.ceilingColor,
+          attachedRooms: data.attachedRooms || [],
           selectedFurnitureId: null,
         });
       },
@@ -288,6 +332,7 @@ export const useRoomStore = create<RoomState>()(
           wallTextures: state.wallTextures,
           floorColor: state.floorColor,
           ceilingColor: state.ceilingColor,
+          attachedRooms: state.attachedRooms,
         };
       },
       
@@ -321,6 +366,7 @@ export const useRoomStore = create<RoomState>()(
           dimensions: snapshot.dimensions,
           openings: snapshot.openings,
           furniture: snapshot.furniture,
+          attachedRooms: snapshot.attachedRooms,
           wallColors: snapshot.wallColors,
           wallTextures: snapshot.wallTextures,
           floorColor: snapshot.floorColor,
@@ -346,6 +392,7 @@ export const useRoomStore = create<RoomState>()(
             dimensions: nextSnapshot.dimensions,
             openings: nextSnapshot.openings,
             furniture: nextSnapshot.furniture,
+            attachedRooms: nextSnapshot.attachedRooms,
             wallColors: nextSnapshot.wallColors,
             wallTextures: nextSnapshot.wallTextures,
             floorColor: nextSnapshot.floorColor,
@@ -365,6 +412,7 @@ export const useRoomStore = create<RoomState>()(
         dimensions: state.dimensions,
         openings: state.openings,
         furniture: state.furniture,
+        attachedRooms: state.attachedRooms,
         wallColors: state.wallColors,
         wallTextures: state.wallTextures,
         floorColor: state.floorColor,

@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useRoomStore, Opening, WallTexture } from '@/store/roomStore';
 import DraggableOpening from './DraggableOpening';
+import AttachedRoom from './AttachedRoom';
 import * as THREE from 'three';
 import { createWallTexture } from '@/lib/wallTextures';
 
@@ -44,7 +45,7 @@ const createWallWithOpenings = (
 };
 
 const Room = ({ width, length, height }: RoomProps) => {
-  const { wallColors, wallTextures, floorColor, openings } = useRoomStore();
+  const { wallColors, wallTextures, floorColor, openings, attachedRooms } = useRoomStore();
 
   const wallThickness = 0.08;
 
@@ -186,6 +187,17 @@ const Room = ({ width, length, height }: RoomProps) => {
         <boxGeometry args={[0.04, 0.1, length]} />
         <meshStandardMaterial color="#1a1a1a" />
       </mesh>
+
+      {/* Attached rooms (bathroom/kitchen) */}
+      {attachedRooms.map((room) => (
+        <AttachedRoom
+          key={room.type}
+          room={room}
+          mainRoomWidth={width}
+          mainRoomLength={length}
+          mainRoomHeight={height}
+        />
+      ))}
     </group>
   );
 };

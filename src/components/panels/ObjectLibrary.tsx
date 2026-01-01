@@ -1,5 +1,6 @@
 import { useRoomStore, FurnitureItem, convertToMeters } from '@/store/roomStore';
 import { Button } from '@/components/ui/button';
+import { Separator } from '@/components/ui/separator';
 import { 
   Bed, 
   Sofa, 
@@ -10,6 +11,7 @@ import {
   Frame,
   Fan,
 } from 'lucide-react';
+import AttachedRoomsPanel from './AttachedRoomsPanel';
 
 const FURNITURE_CATALOG: {
   type: FurnitureItem['type'];
@@ -87,11 +89,15 @@ const ObjectLibrary = () => {
         ))}
       </div>
 
-      <div className="mt-6 px-1">
+      <div className="mt-4 px-1">
         <p className="text-xs text-muted-foreground">
           Click to add furniture. Paintings go on walls, fans on ceiling.
         </p>
       </div>
+
+      <Separator className="my-4" />
+
+      <AttachedRoomsPanel />
     </div>
   );
 };
