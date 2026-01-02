@@ -12,6 +12,7 @@ interface DraggableOpeningProps {
 
 const DraggableOpening = ({ opening, roomWidth, roomLength, roomHeight }: DraggableOpeningProps) => {
   const updateOpening = useRoomStore((state) => state.updateOpening);
+  const cameraLocked = useRoomStore((state) => state.cameraLocked);
   const [isDragging, setIsDragging] = useState(false);
   const [hovered, setHovered] = useState(false);
   const groupRef = useRef<THREE.Group>(null);
@@ -65,9 +66,11 @@ const DraggableOpening = ({ opening, roomWidth, roomLength, roomHeight }: Dragga
 
   const handlePointerDown = useCallback((e: ThreeEvent<PointerEvent>) => {
     e.stopPropagation();
+    // Only allow dragging when camera is locked
+    if (!cameraLocked) return;
     setIsDragging(true);
     document.body.style.cursor = 'grabbing';
-  }, []);
+  }, [cameraLocked]);
 
   const handlePointerUp = useCallback(() => {
     setIsDragging(false);

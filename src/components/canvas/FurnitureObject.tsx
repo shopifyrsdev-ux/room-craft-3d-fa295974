@@ -249,6 +249,7 @@ const FURNITURE_MODELS: Record<FurnitureItem['type'], React.FC<{ color: string }
 const FurnitureObject = ({ item, isSelected, onSelect, roomBounds }: FurnitureObjectProps) => {
   const groupRef = useRef<THREE.Group>(null);
   const updateFurniture = useRoomStore((state) => state.updateFurniture);
+  const cameraLocked = useRoomStore((state) => state.cameraLocked);
   const [isDragging, setIsDragging] = useState(false);
   const lastUpdateRef = useRef<number>(0);
   const throttleMs = 16; // ~60fps throttle for drag updates
@@ -297,9 +298,11 @@ const FurnitureObject = ({ item, isSelected, onSelect, roomBounds }: FurnitureOb
   const handlePointerDown = useCallback((e: ThreeEvent<PointerEvent>) => {
     e.stopPropagation();
     onSelect();
+    // Only allow dragging when camera is locked
+    if (!cameraLocked) return;
     setIsDragging(true);
     document.body.style.cursor = 'grabbing';
-  }, [onSelect]);
+  }, [onSelect, cameraLocked]);
 
   const handlePointerUp = useCallback(() => {
     setIsDragging(false);
