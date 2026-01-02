@@ -49,13 +49,34 @@ const Room = ({ width, length, height }: RoomProps) => {
 
   const wallThickness = 0.08;
 
+  // Generate door openings for attached rooms
+  const attachedRoomOpenings = useMemo(() => {
+    return attachedRooms.map((room) => {
+      const doorWidth = Math.min(0.9, room.length * 0.6);
+      const doorHeight = Math.min(2.1, room.height - 0.1);
+      
+      return {
+        id: `attached-${room.type}`,
+        type: 'door' as const,
+        wall: room.wall,
+        position: 0.5, // Center of wall
+        width: doorWidth,
+        height: doorHeight,
+        elevation: 0,
+      };
+    });
+  }, [attachedRooms]);
+
+  // Combine regular openings with attached room door openings
+  const allOpenings = useMemo(() => [...openings, ...attachedRoomOpenings], [openings, attachedRoomOpenings]);
+
   // Group openings by wall
   const openingsByWall = useMemo(() => ({
-    north: openings.filter((o) => o.wall === 'north'),
-    south: openings.filter((o) => o.wall === 'south'),
-    east: openings.filter((o) => o.wall === 'east'),
-    west: openings.filter((o) => o.wall === 'west'),
-  }), [openings]);
+    north: allOpenings.filter((o) => o.wall === 'north'),
+    south: allOpenings.filter((o) => o.wall === 'south'),
+    east: allOpenings.filter((o) => o.wall === 'east'),
+    west: allOpenings.filter((o) => o.wall === 'west'),
+  }), [allOpenings]);
 
   // Create wall geometries with cutouts
   const walls = useMemo(() => {
