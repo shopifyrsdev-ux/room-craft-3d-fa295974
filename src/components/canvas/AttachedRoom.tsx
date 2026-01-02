@@ -227,34 +227,72 @@ const CounterModel = ({ position, rotation, width = 1.5 }: { position: [number, 
   );
 };
 
+// Door frame between rooms
+const DoorFrame = ({ width, height }: { width: number; height: number }) => {
+  const frameMaterial = useMemo(() => 
+    new THREE.MeshStandardMaterial({ color: '#5a4a3a', roughness: 0.7 }), []);
+  
+  const frameDepth = 0.15;
+  const frameThickness = 0.06;
+
+  return (
+    <group>
+      {/* Left frame */}
+      <mesh position={[-width/2 - frameThickness/2, height/2, 0]} castShadow material={frameMaterial}>
+        <boxGeometry args={[frameThickness, height, frameDepth]} />
+      </mesh>
+      {/* Right frame */}
+      <mesh position={[width/2 + frameThickness/2, height/2, 0]} castShadow material={frameMaterial}>
+        <boxGeometry args={[frameThickness, height, frameDepth]} />
+      </mesh>
+      {/* Top frame */}
+      <mesh position={[0, height + frameThickness/2, 0]} castShadow material={frameMaterial}>
+        <boxGeometry args={[width + frameThickness * 2, frameThickness, frameDepth]} />
+      </mesh>
+      {/* Threshold */}
+      <mesh position={[0, 0.015, 0]} castShadow>
+        <boxGeometry args={[width, 0.03, frameDepth]} />
+        <meshStandardMaterial color="#4a3a2a" roughness={0.6} />
+      </mesh>
+    </group>
+  );
+};
+
 const AttachedRoom = ({ room, mainRoomWidth, mainRoomLength, mainRoomHeight }: AttachedRoomProps) => {
   const wallThickness = 0.08;
+  const doorWidth = Math.min(0.9, room.length * 0.6); // Door is 60% of room length, max 0.9m
+  const doorHeight = Math.min(2.1, room.height - 0.1); // Standard door height
   
   // Calculate position based on which wall it's attached to
-  const { position, rotation } = useMemo(() => {
+  const { position, rotation, doorPosition } = useMemo(() => {
     let pos: [number, number, number] = [0, 0, 0];
+    let doorPos: [number, number, number] = [0, 0, 0];
     let rot = 0;
     
     switch (room.wall) {
       case 'north':
         pos = [0, 0, -mainRoomLength / 2 - room.width / 2 - wallThickness];
+        doorPos = [0, 0, -mainRoomLength / 2];
         rot = 0;
         break;
       case 'south':
         pos = [0, 0, mainRoomLength / 2 + room.width / 2 + wallThickness];
+        doorPos = [0, 0, mainRoomLength / 2];
         rot = Math.PI;
         break;
       case 'east':
         pos = [mainRoomWidth / 2 + room.width / 2 + wallThickness, 0, 0];
+        doorPos = [mainRoomWidth / 2, 0, 0];
         rot = -Math.PI / 2;
         break;
       case 'west':
         pos = [-mainRoomWidth / 2 - room.width / 2 - wallThickness, 0, 0];
+        doorPos = [-mainRoomWidth / 2, 0, 0];
         rot = Math.PI / 2;
         break;
     }
     
-    return { position: pos, rotation: rot };
+    return { position: pos, rotation: rot, doorPosition: doorPos };
   }, [room.wall, room.width, mainRoomWidth, mainRoomLength]);
 
   const wallMaterial = useMemo(() => 
@@ -269,30 +307,71 @@ const AttachedRoom = ({ room, mainRoomWidth, mainRoomLength, mainRoomHeight }: A
       roughness: 0.6 
     }), [room.type]);
 
-  return (
-    <group position={position} rotation={[0, rotation, 0]}>
-      {/* Floor */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]} receiveShadow>
-        <planeGeometry args={[room.length, room.width]} />
-        <primitive object={floorMaterial} />
-      </mesh>
+  // Create front wall with door opening
+  const frontWallGeometry = useMemo(() => {
+    const shape = new THREE.Shape();
+    shape.moveTo(-room.length / 2, 0);
+    shape.lineTo(room.length / 2, 0);
+    shape.lineTo(room.length / 2, room.height);
+    shape.lineTo(-room.length / 2, room.height);
+    shape.lineTo(-room.length / 2, 0);
 
-      {/* Walls */}
-      {/* Back wall (away from main room) */}
-      <mesh position={[0, room.height / 2, -room.width / 2]} receiveShadow castShadow>
-        <boxGeometry args={[room.length, room.height, wallThickness]} />
-        <primitive object={wallMaterial} />
-      </mesh>
-      {/* Left wall */}
-      <mesh position={[-room.length / 2, room.height / 2, 0]} receiveShadow castShadow>
-        <boxGeometry args={[wallThickness, room.height, room.width]} />
-        <primitive object={wallMaterial} />
-      </mesh>
-      {/* Right wall */}
-      <mesh position={[room.length / 2, room.height / 2, 0]} receiveShadow castShadow>
-        <boxGeometry args={[wallThickness, room.height, room.width]} />
-        <primitive object={wallMaterial} />
-      </mesh>
+    // Create door hole in the center
+    const hole = new THREE.Path();
+    hole.moveTo(-doorWidth / 2, 0);
+    hole.lineTo(doorWidth / 2, 0);
+    hole.lineTo(doorWidth / 2, doorHeight);
+    hole.lineTo(-doorWidth / 2, doorHeight);
+    hole.lineTo(-doorWidth / 2, 0);
+    shape.holes.push(hole);
+
+    const geometry = new THREE.ExtrudeGeometry(shape, {
+      depth: wallThickness,
+      bevelEnabled: false,
+    });
+    geometry.translate(0, 0, -wallThickness / 2);
+    
+    return geometry;
+  }, [room.length, room.height, doorWidth, doorHeight]);
+
+  return (
+    <>
+      {/* Door frame at the connection point */}
+      <group position={doorPosition} rotation={[0, rotation, 0]}>
+        <DoorFrame width={doorWidth} height={doorHeight} />
+      </group>
+
+      <group position={position} rotation={[0, rotation, 0]}>
+        {/* Floor */}
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]} receiveShadow>
+          <planeGeometry args={[room.length, room.width]} />
+          <primitive object={floorMaterial} />
+        </mesh>
+
+        {/* Front wall with door opening (faces main room) */}
+        <mesh 
+          geometry={frontWallGeometry}
+          position={[0, 0, room.width / 2]} 
+          receiveShadow 
+          castShadow
+          material={wallMaterial}
+        />
+
+        {/* Back wall (away from main room) */}
+        <mesh position={[0, room.height / 2, -room.width / 2]} receiveShadow castShadow>
+          <boxGeometry args={[room.length, room.height, wallThickness]} />
+          <primitive object={wallMaterial} />
+        </mesh>
+        {/* Left wall */}
+        <mesh position={[-room.length / 2, room.height / 2, 0]} receiveShadow castShadow>
+          <boxGeometry args={[wallThickness, room.height, room.width]} />
+          <primitive object={wallMaterial} />
+        </mesh>
+        {/* Right wall */}
+        <mesh position={[room.length / 2, room.height / 2, 0]} receiveShadow castShadow>
+          <boxGeometry args={[wallThickness, room.height, room.width]} />
+          <primitive object={wallMaterial} />
+        </mesh>
 
       {/* Room-specific fixtures */}
       {room.type === 'bathroom' ? (
@@ -333,12 +412,13 @@ const AttachedRoom = ({ room, mainRoomWidth, mainRoomLength, mainRoomHeight }: A
         </>
       )}
 
-      {/* Ceiling */}
-      <mesh position={[0, room.height, 0]} receiveShadow>
-        <boxGeometry args={[room.length, 0.05, room.width]} />
-        <meshStandardMaterial color="#ffffff" />
-      </mesh>
-    </group>
+        {/* Ceiling */}
+        <mesh position={[0, room.height, 0]} receiveShadow>
+          <boxGeometry args={[room.length, 0.05, room.width]} />
+          <meshStandardMaterial color="#ffffff" />
+        </mesh>
+      </group>
+    </>
   );
 };
 
