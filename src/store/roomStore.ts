@@ -292,11 +292,10 @@ export const useRoomStore = create<RoomState>()(
       cameraLocked: false,
       toggleCameraLock: () => set((state) => ({ cameraLocked: !state.cameraLocked })),
       
-      // Reset keeps dimensions but clears everything else
+      // Reset keeps dimensions, doors, and windows - only clears furniture and attached rooms
       resetRoom: () => {
         get().saveToHistory();
         set((state) => ({
-          openings: [],
           furniture: [],
           attachedRooms: [],
           selectedFurnitureId: null,
