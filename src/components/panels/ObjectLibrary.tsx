@@ -12,6 +12,7 @@ import {
   Fan,
 } from 'lucide-react';
 import AttachedRoomsPanel from './AttachedRoomsPanel';
+import CustomModelsPanel from './CustomModelsPanel';
 
 const FURNITURE_CATALOG: {
   type: FurnitureItem['type'];
@@ -98,6 +99,10 @@ const ObjectLibrary = () => {
       <Separator className="my-4" />
 
       <AttachedRoomsPanel />
+
+      <Separator className="my-4" />
+
+      <CustomModelsPanel />
     </div>
   );
 };

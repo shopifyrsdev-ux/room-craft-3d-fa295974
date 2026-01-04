@@ -14,6 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      custom_models: {
+        Row: {
+          created_at: string
+          file_path: string
+          id: string
+          name: string
+          placement_type: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          file_path: string
+          id?: string
+          name: string
+          placement_type: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          file_path?: string
+          id?: string
+          name?: string
+          placement_type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       room_designs: {
         Row: {
           created_at: string

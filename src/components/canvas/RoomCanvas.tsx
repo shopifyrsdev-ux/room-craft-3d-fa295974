@@ -1,13 +1,14 @@
-import { useRef } from 'react';
+import { useRef, Suspense } from 'react';
 import { Canvas, useThree } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera, Grid, Environment } from '@react-three/drei';
 import { useRoomStore, convertToMeters } from '@/store/roomStore';
 import Room from './Room';
 import FurnitureObject from './FurnitureObject';
+import CustomModelObject from './CustomModelObject';
 import * as THREE from 'three';
 
 const Scene = () => {
-  const { dimensions, furniture, showGrid, cameraLocked, selectFurniture, selectedFurnitureId } = useRoomStore();
+  const { dimensions, furniture, customModels, showGrid, cameraLocked, selectFurniture, selectedFurnitureId } = useRoomStore();
   
   if (!dimensions) return null;
 
@@ -94,6 +95,18 @@ const Scene = () => {
         />
       ))}
 
+      {/* Custom uploaded models */}
+      <Suspense fallback={null}>
+        {customModels.map((item) => (
+          <CustomModelObject
+            key={item.id}
+            item={item}
+            isSelected={selectedFurnitureId === item.id}
+            onSelect={() => selectFurniture(item.id)}
+            roomBounds={{ width, length, height }}
+          />
+        ))}
+      </Suspense>
       {/* Grid helper */}
       {showGrid && (
         <Grid
