@@ -155,6 +155,10 @@ export interface RoomState {
   ceilingColor: string;
   setCeilingColor: (color: string) => void;
   
+  // Selection state
+  selectedCustomModelId: string | null;
+  selectCustomModel: (id: string | null) => void;
+  
   // UI state
   showGrid: boolean;
   toggleGrid: () => void;
@@ -258,7 +262,10 @@ export const useRoomStore = create<RoomState>()(
         }));
       },
       selectedFurnitureId: null,
-      selectFurniture: (id) => set({ selectedFurnitureId: id }),
+      selectFurniture: (id) => set({ selectedFurnitureId: id, selectedCustomModelId: null }),
+      
+      selectedCustomModelId: null,
+      selectCustomModel: (id) => set({ selectedCustomModelId: id, selectedFurnitureId: null }),
       
       // Attached rooms
       attachedRooms: [],

@@ -8,7 +8,7 @@ import CustomModelObject from './CustomModelObject';
 import * as THREE from 'three';
 
 const Scene = () => {
-  const { dimensions, furniture, customModels, showGrid, cameraLocked, selectFurniture, selectedFurnitureId } = useRoomStore();
+  const { dimensions, furniture, customModels, showGrid, cameraLocked, selectFurniture, selectedFurnitureId, selectCustomModel, selectedCustomModelId } = useRoomStore();
   
   if (!dimensions) return null;
 
@@ -101,8 +101,8 @@ const Scene = () => {
           <CustomModelObject
             key={item.id}
             item={item}
-            isSelected={selectedFurnitureId === item.id}
-            onSelect={() => selectFurniture(item.id)}
+            isSelected={selectedCustomModelId === item.id}
+            onSelect={() => selectCustomModel(item.id)}
             roomBounds={{ width, length, height }}
           />
         ))}
@@ -143,7 +143,10 @@ const RoomCanvas = () => {
           toneMapping: THREE.ACESFilmicToneMapping,
           toneMappingExposure: 1.0,
         }}
-        onPointerMissed={() => useRoomStore.getState().selectFurniture(null)}
+        onPointerMissed={() => {
+          useRoomStore.getState().selectFurniture(null);
+          useRoomStore.getState().selectCustomModel(null);
+        }}
       >
         <Scene />
       </Canvas>
