@@ -56,16 +56,15 @@ const CustomModelsPanel = () => {
     const file = e.target.files?.[0];
     if (!file || !user) return;
 
-    // Validate file type
-    const validExtensions = ['.glb', '.gltf'];
+    // Validate file type - only GLB is supported (GLTF requires multiple files)
     const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
-    if (!validExtensions.includes(fileExtension)) {
-      toast.error('Only GLB/GLTF files are supported');
+    if (fileExtension !== '.glb') {
+      toast.error('Only GLB files are supported. GLTF requires multiple files - please convert to GLB first.');
       return;
     }
 
     // Validate name
-    const name = modelName.trim() || file.name.replace(/\.(glb|gltf)$/i, '');
+    const name = modelName.trim() || file.name.replace(/\.glb$/i, '');
     if (!name) {
       toast.error('Please enter a model name');
       return;
@@ -177,7 +176,7 @@ const CustomModelsPanel = () => {
       <div className="space-y-3">
         <h3 className="font-medium text-sm">Custom Models</h3>
         <p className="text-xs text-muted-foreground">
-          Sign in to upload and use custom 3D models (GLB/GLTF).
+          Sign in to upload and use custom 3D models (GLB format).
         </p>
       </div>
     );
@@ -222,7 +221,7 @@ const CustomModelsPanel = () => {
           </RadioGroup>
         </div>
 
-        <div className="pt-2">
+        <div className="pt-2 space-y-2">
           <label className="cursor-pointer">
             <Button
               variant="outline"
@@ -237,17 +236,20 @@ const CustomModelsPanel = () => {
                 ) : (
                   <Upload className="w-4 h-4 mr-2" />
                 )}
-                {uploading ? 'Uploading...' : 'Upload GLB/GLTF'}
+                {uploading ? 'Uploading...' : 'Upload GLB File'}
               </span>
             </Button>
             <input
               type="file"
-              accept=".glb,.gltf"
+              accept=".glb"
               className="hidden"
               onChange={handleFileUpload}
               disabled={uploading}
             />
           </label>
+          <p className="text-[10px] text-muted-foreground text-center">
+            Only GLB format supported. On Sketchfab, download as "Autoconverted format (glTF)" and select the .glb file.
+          </p>
         </div>
       </div>
 
