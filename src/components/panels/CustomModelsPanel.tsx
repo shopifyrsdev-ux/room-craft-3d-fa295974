@@ -9,6 +9,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useRoomStore, convertToMeters } from '@/store/roomStore';
 import { toast } from 'sonner';
+import GltfToGlbConverter from './GltfToGlbConverter';
 
 interface CustomModel {
   id: string;
@@ -248,8 +249,9 @@ const CustomModelsPanel = () => {
             />
           </label>
           <p className="text-[10px] text-muted-foreground text-center">
-            Only GLB format supported. On Sketchfab, download as "Autoconverted format (glTF)" and select the .glb file.
+            Only GLB format supported. Have GLTF files? Use the converter below.
           </p>
+          <GltfToGlbConverter />
         </div>
       </div>
 
