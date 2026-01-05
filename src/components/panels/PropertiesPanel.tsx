@@ -1,9 +1,10 @@
-import { useRoomStore, FurnitureItem, WallColors, WallTextures, WallTexture, DEFAULT_FURNITURE_DIMENSIONS, FurnitureDimensions } from '@/store/roomStore';
+import { useRoomStore, FurnitureItem, WallColors, WallTextures, WallTexture, DEFAULT_FURNITURE_DIMENSIONS, FurnitureDimensions, CustomModelItem } from '@/store/roomStore';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
+import { Slider } from '@/components/ui/slider';
 import { Trash2, RotateCw } from 'lucide-react';
 import { TEXTURE_OPTIONS } from '@/lib/wallTextures';
 
@@ -20,6 +21,11 @@ const PropertiesPanel = () => {
     updateFurniture,
     removeFurniture,
     selectFurniture,
+    selectedCustomModelId,
+    customModels,
+    updateCustomModel,
+    removeCustomModel,
+    selectCustomModel,
     wallColors,
     setWallColor,
     wallTextures,
@@ -29,6 +35,7 @@ const PropertiesPanel = () => {
   } = useRoomStore();
 
   const selectedItem = furniture.find((f) => f.id === selectedFurnitureId);
+  const selectedCustomModel = customModels.find((m) => m.id === selectedCustomModelId);
 
   const handleRotate = () => {
     if (!selectedItem) return;
@@ -76,6 +83,180 @@ const PropertiesPanel = () => {
     }
     return DEFAULT_FURNITURE_DIMENSIONS[selectedItem.type];
   };
+
+  // Custom model handlers
+  const handleCustomModelRotate = () => {
+    if (!selectedCustomModel) return;
+    const newRotation: [number, number, number] = [
+      selectedCustomModel.rotation[0],
+      selectedCustomModel.rotation[1] + Math.PI / 4,
+      selectedCustomModel.rotation[2],
+    ];
+    updateCustomModel(selectedCustomModel.id, { rotation: newRotation });
+  };
+
+  const handleCustomModelDelete = () => {
+    if (!selectedCustomModel) return;
+    removeCustomModel(selectedCustomModel.id);
+  };
+
+  const handleCustomModelScaleChange = (axis: 'x' | 'y' | 'z', value: number) => {
+    if (!selectedCustomModel) return;
+    const newScale: [number, number, number] = [...selectedCustomModel.scale];
+    const idx = axis === 'x' ? 0 : axis === 'y' ? 1 : 2;
+    newScale[idx] = value;
+    updateCustomModel(selectedCustomModel.id, { scale: newScale });
+  };
+
+  const handleCustomModelUniformScale = (value: number) => {
+    if (!selectedCustomModel) return;
+    updateCustomModel(selectedCustomModel.id, { scale: [value, value, value] });
+  };
+
+  const handleCustomModelRotationChange = (axis: 'x' | 'y' | 'z', degrees: number) => {
+    if (!selectedCustomModel) return;
+    const newRotation: [number, number, number] = [...selectedCustomModel.rotation];
+    const idx = axis === 'x' ? 0 : axis === 'y' ? 1 : 2;
+    newRotation[idx] = (degrees * Math.PI) / 180;
+    updateCustomModel(selectedCustomModel.id, { rotation: newRotation });
+  };
+
+  const radToDeg = (rad: number) => Math.round((rad * 180) / Math.PI);
+
+  // Render custom model properties
+  if (selectedCustomModel) {
+    return (
+      <div className="glass-panel p-4 w-72 h-full overflow-y-auto">
+        <h2 className="font-display text-lg font-semibold mb-4 px-1">Properties</h2>
+        
+        <div className="space-y-6">
+          {/* Selected Item Info */}
+          <div className="p-3 rounded-lg bg-secondary/50 border border-primary/20">
+            <div className="flex items-center justify-between">
+              <span className="font-medium truncate">{selectedCustomModel.name}</span>
+              <div className="flex gap-1">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleCustomModelRotate}
+                  className="h-8 w-8"
+                >
+                  <RotateCw className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleCustomModelDelete}
+                  className="h-8 w-8 text-destructive hover:text-destructive"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1 capitalize">
+              {selectedCustomModel.placementType} mounted
+            </p>
+          </div>
+
+          {/* Uniform Scale */}
+          <div className="space-y-3">
+            <Label className="text-sm">Uniform Scale</Label>
+            <div className="flex items-center gap-3">
+              <Slider
+                value={[selectedCustomModel.scale[0]]}
+                onValueChange={([val]) => handleCustomModelUniformScale(val)}
+                min={0.1}
+                max={5}
+                step={0.1}
+                className="flex-1"
+              />
+              <span className="text-sm w-12 text-right">{selectedCustomModel.scale[0].toFixed(1)}x</span>
+            </div>
+          </div>
+
+          {/* Individual Scale */}
+          <div className="space-y-3">
+            <Label className="text-sm">Scale (X / Y / Z)</Label>
+            <div className="grid grid-cols-3 gap-2">
+              <div>
+                <Label className="text-xs text-muted-foreground">X</Label>
+                <Input
+                  type="number"
+                  step="0.1"
+                  min="0.1"
+                  max="10"
+                  value={selectedCustomModel.scale[0].toFixed(1)}
+                  onChange={(e) => handleCustomModelScaleChange('x', parseFloat(e.target.value) || 0.1)}
+                  className="h-8"
+                />
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">Y</Label>
+                <Input
+                  type="number"
+                  step="0.1"
+                  min="0.1"
+                  max="10"
+                  value={selectedCustomModel.scale[1].toFixed(1)}
+                  onChange={(e) => handleCustomModelScaleChange('y', parseFloat(e.target.value) || 0.1)}
+                  className="h-8"
+                />
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">Z</Label>
+                <Input
+                  type="number"
+                  step="0.1"
+                  min="0.1"
+                  max="10"
+                  value={selectedCustomModel.scale[2].toFixed(1)}
+                  onChange={(e) => handleCustomModelScaleChange('z', parseFloat(e.target.value) || 0.1)}
+                  className="h-8"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Rotation */}
+          <div className="space-y-3">
+            <Label className="text-sm">Rotation (degrees)</Label>
+            <div className="grid grid-cols-3 gap-2">
+              <div>
+                <Label className="text-xs text-muted-foreground">X</Label>
+                <Input
+                  type="number"
+                  step="15"
+                  value={radToDeg(selectedCustomModel.rotation[0])}
+                  onChange={(e) => handleCustomModelRotationChange('x', parseFloat(e.target.value) || 0)}
+                  className="h-8"
+                />
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">Y</Label>
+                <Input
+                  type="number"
+                  step="15"
+                  value={radToDeg(selectedCustomModel.rotation[1])}
+                  onChange={(e) => handleCustomModelRotationChange('y', parseFloat(e.target.value) || 0)}
+                  className="h-8"
+                />
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">Z</Label>
+                <Input
+                  type="number"
+                  step="15"
+                  value={radToDeg(selectedCustomModel.rotation[2])}
+                  onChange={(e) => handleCustomModelRotationChange('z', parseFloat(e.target.value) || 0)}
+                  className="h-8"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="glass-panel p-4 w-72 h-full overflow-y-auto">
