@@ -117,23 +117,27 @@ const CustomModelObject = ({ item, isSelected, onSelect, roomBounds }: CustomMod
       const distToEast = Math.abs(point.x - (roomBounds.width / 2));
       
       const minDist = Math.min(distToNorth, distToSouth, distToWest, distToEast);
-      const wallHeight = 1.5;
+      
+      // Allow vertical movement within wall bounds (with margin from floor and ceiling)
+      const minY = 0.2;
+      const maxY = roomBounds.height - 0.2;
+      const clampedY = Math.max(minY, Math.min(maxY, point.y));
       
       let newWall: 'north' | 'south' | 'east' | 'west';
       let newPosition: [number, number, number];
 
       if (minDist === distToNorth) {
         newWall = 'north';
-        newPosition = [Math.max(-halfWidth, Math.min(halfWidth, point.x)), wallHeight, 0];
+        newPosition = [Math.max(-halfWidth, Math.min(halfWidth, point.x)), clampedY, 0];
       } else if (minDist === distToSouth) {
         newWall = 'south';
-        newPosition = [Math.max(-halfWidth, Math.min(halfWidth, point.x)), wallHeight, 0];
+        newPosition = [Math.max(-halfWidth, Math.min(halfWidth, point.x)), clampedY, 0];
       } else if (minDist === distToWest) {
         newWall = 'west';
-        newPosition = [0, wallHeight, Math.max(-halfLength, Math.min(halfLength, point.z))];
+        newPosition = [0, clampedY, Math.max(-halfLength, Math.min(halfLength, point.z))];
       } else {
         newWall = 'east';
-        newPosition = [0, wallHeight, Math.max(-halfLength, Math.min(halfLength, point.z))];
+        newPosition = [0, clampedY, Math.max(-halfLength, Math.min(halfLength, point.z))];
       }
 
       updateCustomModel(item.id, { position: newPosition, wall: newWall });
