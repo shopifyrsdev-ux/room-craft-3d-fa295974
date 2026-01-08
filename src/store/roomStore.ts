@@ -114,6 +114,12 @@ interface HistorySnapshot {
   attachedRooms: AttachedRoom[];
 }
 
+export interface SnapSettings {
+  enabled: boolean;
+  gridSize: number; // in meters
+  presets: boolean; // top/middle/bottom snap points
+}
+
 export interface RoomState {
   // Room setup
   dimensions: RoomDimensions | null;
@@ -164,6 +170,12 @@ export interface RoomState {
   toggleGrid: () => void;
   cameraLocked: boolean;
   toggleCameraLock: () => void;
+  
+  // Snap settings
+  snapSettings: SnapSettings;
+  setSnapEnabled: (enabled: boolean) => void;
+  setSnapGridSize: (size: number) => void;
+  setSnapPresets: (enabled: boolean) => void;
   
   // Actions
   resetRoom: () => void;
@@ -341,6 +353,18 @@ export const useRoomStore = create<RoomState>()(
       toggleGrid: () => set((state) => ({ showGrid: !state.showGrid })),
       cameraLocked: false,
       toggleCameraLock: () => set((state) => ({ cameraLocked: !state.cameraLocked })),
+      
+      // Snap settings
+      snapSettings: { enabled: false, gridSize: 0.25, presets: true },
+      setSnapEnabled: (enabled) => set((state) => ({ 
+        snapSettings: { ...state.snapSettings, enabled } 
+      })),
+      setSnapGridSize: (gridSize) => set((state) => ({ 
+        snapSettings: { ...state.snapSettings, gridSize } 
+      })),
+      setSnapPresets: (presets) => set((state) => ({ 
+        snapSettings: { ...state.snapSettings, presets } 
+      })),
       
       // Reset keeps dimensions, doors, and windows - only clears furniture and attached rooms
       resetRoom: () => {

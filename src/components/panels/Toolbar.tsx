@@ -17,10 +17,19 @@ import {
   LogIn,
   LogOut,
   User,
+  Magnet,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import SaveDesignDialog from '@/components/dialogs/SaveDesignDialog';
 import LoadDesignDialog from '@/components/dialogs/LoadDesignDialog';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { Slider } from '@/components/ui/slider';
 
 interface ToolbarProps {
   onExit: () => void;
@@ -41,6 +50,10 @@ const Toolbar = ({ onExit }: ToolbarProps) => {
     redo,
     canUndo,
     canRedo,
+    snapSettings,
+    setSnapEnabled,
+    setSnapGridSize,
+    setSnapPresets,
   } = useRoomStore();
 
   const { user, signOut } = useAuth();
@@ -137,6 +150,61 @@ const Toolbar = ({ onExit }: ToolbarProps) => {
           {cameraLocked ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
           {cameraLocked ? 'Unlock' : 'Lock'}
         </Button>
+
+        {/* Snap Toggle */}
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              variant={snapSettings.enabled ? 'secondary' : 'ghost'}
+              size="sm"
+              className="gap-2"
+              title="Snap settings for wall-mounted items"
+            >
+              <Magnet className="w-4 h-4" />
+              Snap
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-64" align="start">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="snap-enabled" className="text-sm font-medium">Enable Snapping</Label>
+                <Switch
+                  id="snap-enabled"
+                  checked={snapSettings.enabled}
+                  onCheckedChange={setSnapEnabled}
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="snap-presets" className="text-sm">Preset Points</Label>
+                  <Switch
+                    id="snap-presets"
+                    checked={snapSettings.presets}
+                    onCheckedChange={setSnapPresets}
+                    disabled={!snapSettings.enabled}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">Snap to top, middle, bottom of wall</p>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm">Grid Size</Label>
+                  <span className="text-xs text-muted-foreground">{snapSettings.gridSize}m</span>
+                </div>
+                <Slider
+                  value={[snapSettings.gridSize]}
+                  onValueChange={([value]) => setSnapGridSize(value)}
+                  min={0.1}
+                  max={0.5}
+                  step={0.05}
+                  disabled={!snapSettings.enabled}
+                />
+              </div>
+            </div>
+          </PopoverContent>
+        </Popover>
 
         <div className="h-6 w-px bg-border" />
 

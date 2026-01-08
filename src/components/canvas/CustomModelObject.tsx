@@ -38,9 +38,37 @@ const CustomModelObject = ({ item, isSelected, onSelect, roomBounds }: CustomMod
   const groupRef = useRef<THREE.Group>(null);
   const updateCustomModel = useRoomStore((state) => state.updateCustomModel);
   const cameraLocked = useRoomStore((state) => state.cameraLocked);
+  const snapSettings = useRoomStore((state) => state.snapSettings);
   const [isDragging, setIsDragging] = useState(false);
   const lastUpdateRef = useRef<number>(0);
   const throttleMs = 16;
+
+  // Snap helper function
+  const applySnap = useCallback((value: number, axis: 'horizontal' | 'vertical') => {
+    if (!snapSettings.enabled) return value;
+
+    // Preset snapping for vertical axis (top/middle/bottom)
+    if (axis === 'vertical' && snapSettings.presets) {
+      const bottom = 0.3;
+      const middle = roomBounds.height / 2;
+      const top = roomBounds.height - 0.3;
+      const presets = [bottom, middle, top];
+      const threshold = 0.15; // Snap threshold in meters
+
+      for (const preset of presets) {
+        if (Math.abs(value - preset) < threshold) {
+          return preset;
+        }
+      }
+    }
+
+    // Grid snapping
+    if (snapSettings.gridSize > 0) {
+      return Math.round(value / snapSettings.gridSize) * snapSettings.gridSize;
+    }
+
+    return value;
+  }, [snapSettings, roomBounds.height]);
 
   // Calculate position based on placement type
   const transform = useMemo(() => {
@@ -131,21 +159,28 @@ const CustomModelObject = ({ item, isSelected, onSelect, roomBounds }: CustomMod
       const maxY = roomBounds.height - 0.2;
       const clampedY = Math.max(minY, Math.min(maxY, point.y));
       
+      // Apply snap to vertical position
+      const snappedY = applySnap(clampedY, 'vertical');
+      
       let newWall: 'north' | 'south' | 'east' | 'west';
       let newPosition: [number, number, number];
 
       if (minDist === distToNorth) {
         newWall = 'north';
-        newPosition = [Math.max(-halfWidth, Math.min(halfWidth, point.x)), clampedY, 0];
+        const snappedX = applySnap(Math.max(-halfWidth, Math.min(halfWidth, point.x)), 'horizontal');
+        newPosition = [snappedX, snappedY, 0];
       } else if (minDist === distToSouth) {
         newWall = 'south';
-        newPosition = [Math.max(-halfWidth, Math.min(halfWidth, point.x)), clampedY, 0];
+        const snappedX = applySnap(Math.max(-halfWidth, Math.min(halfWidth, point.x)), 'horizontal');
+        newPosition = [snappedX, snappedY, 0];
       } else if (minDist === distToWest) {
         newWall = 'west';
-        newPosition = [0, clampedY, Math.max(-halfLength, Math.min(halfLength, point.z))];
+        const snappedZ = applySnap(Math.max(-halfLength, Math.min(halfLength, point.z)), 'horizontal');
+        newPosition = [0, snappedY, snappedZ];
       } else {
         newWall = 'east';
-        newPosition = [0, clampedY, Math.max(-halfLength, Math.min(halfLength, point.z))];
+        const snappedZ = applySnap(Math.max(-halfLength, Math.min(halfLength, point.z)), 'horizontal');
+        newPosition = [0, snappedY, snappedZ];
       }
 
       updateCustomModel(item.id, { position: newPosition, wall: newWall });
@@ -166,7 +201,7 @@ const CustomModelObject = ({ item, isSelected, onSelect, roomBounds }: CustomMod
         ],
       });
     }
-  }, [isDragging, item.id, item.placementType, item.position, roomBounds, updateCustomModel]);
+  }, [isDragging, item.id, item.placementType, item.position, roomBounds, updateCustomModel, applySnap]);
 
   const selectionMaterial = useMemo(() => 
     new THREE.MeshBasicMaterial({ color: "#f59e0b", transparent: true, opacity: 0.6 }), 
