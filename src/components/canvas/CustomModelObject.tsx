@@ -85,11 +85,19 @@ const CustomModelObject = ({ item, isSelected, onSelect, roomBounds }: CustomMod
     e.stopPropagation();
     onSelect();
     if (!cameraLocked) return;
+
+    // Capture pointer so we keep receiving move events even if the cursor leaves the model
+    (e.target as unknown as { setPointerCapture?: (id: number) => void })
+      .setPointerCapture?.(e.pointerId);
+
     setIsDragging(true);
     document.body.style.cursor = 'grabbing';
   }, [onSelect, cameraLocked]);
 
-  const handlePointerUp = useCallback(() => {
+  const handlePointerUp = useCallback((e: ThreeEvent<PointerEvent>) => {
+    (e.target as unknown as { releasePointerCapture?: (id: number) => void })
+      .releasePointerCapture?.(e.pointerId);
+
     setIsDragging(false);
     document.body.style.cursor = 'auto';
   }, []);
