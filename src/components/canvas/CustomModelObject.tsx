@@ -1,5 +1,5 @@
 import { useRef, useState, useMemo, useCallback, Suspense } from 'react';
-import { ThreeEvent } from '@react-three/fiber';
+import { ThreeEvent, useThree } from '@react-three/fiber';
 import { useGLTF } from '@react-three/drei';
 import { useRoomStore, CustomModelItem } from '@/store/roomStore';
 import * as THREE from 'three';
@@ -16,7 +16,6 @@ const LoadedModel = ({ url, color }: { url: string; color?: string }) => {
   
   const clonedScene = useMemo(() => {
     const clone = scene.clone();
-    // Optional: Apply color tint to meshes
     if (color) {
       clone.traverse((child) => {
         if (child instanceof THREE.Mesh && child.material) {
@@ -42,18 +41,22 @@ const CustomModelObject = ({ item, isSelected, onSelect, roomBounds }: CustomMod
   const [isDragging, setIsDragging] = useState(false);
   const lastUpdateRef = useRef<number>(0);
   const throttleMs = 16;
+  const { camera, raycaster, gl } = useThree();
+
+  // Create a drag plane for reliable pointer tracking
+  const dragPlane = useMemo(() => new THREE.Plane(), []);
+  const intersection = useMemo(() => new THREE.Vector3(), []);
 
   // Snap helper function
   const applySnap = useCallback((value: number, axis: 'horizontal' | 'vertical') => {
     if (!snapSettings.enabled) return value;
 
-    // Preset snapping for vertical axis (top/middle/bottom)
     if (axis === 'vertical' && snapSettings.presets) {
       const bottom = 0.3;
       const middle = roomBounds.height / 2;
       const top = roomBounds.height - 0.3;
       const presets = [bottom, middle, top];
-      const threshold = 0.15; // Snap threshold in meters
+      const threshold = 0.15;
 
       for (const preset of presets) {
         if (Math.abs(value - preset) < threshold) {
@@ -62,7 +65,6 @@ const CustomModelObject = ({ item, isSelected, onSelect, roomBounds }: CustomMod
       }
     }
 
-    // Grid snapping
     if (snapSettings.gridSize > 0) {
       return Math.round(value / snapSettings.gridSize) * snapSettings.gridSize;
     }
@@ -109,99 +111,121 @@ const CustomModelObject = ({ item, isSelected, onSelect, roomBounds }: CustomMod
     };
   }, [item.position, item.rotation, item.placementType, item.wall, roomBounds]);
 
+  // Setup drag plane based on wall orientation
+  const setupDragPlane = useCallback(() => {
+    if (item.placementType === 'wall') {
+      // Create a vertical plane facing the camera for wall items
+      const cameraDirection = new THREE.Vector3();
+      camera.getWorldDirection(cameraDirection);
+      // Use a plane that faces the camera but is vertical
+      dragPlane.setFromNormalAndCoplanarPoint(
+        new THREE.Vector3(cameraDirection.x, 0, cameraDirection.z).normalize(),
+        new THREE.Vector3(transform?.position[0] || 0, transform?.position[1] || 0, transform?.position[2] || 0)
+      );
+    } else {
+      // Horizontal plane for floor/ceiling items
+      dragPlane.setFromNormalAndCoplanarPoint(
+        new THREE.Vector3(0, 1, 0),
+        new THREE.Vector3(0, item.position[1], 0)
+      );
+    }
+  }, [camera, dragPlane, item.placementType, item.position, transform?.position]);
+
   const handlePointerDown = useCallback((e: ThreeEvent<PointerEvent>) => {
     e.stopPropagation();
     onSelect();
     if (!cameraLocked) return;
 
-    // Capture pointer so we keep receiving move events even if the cursor leaves the model
-    (e.target as unknown as { setPointerCapture?: (id: number) => void })
-      .setPointerCapture?.(e.pointerId);
-
+    setupDragPlane();
     setIsDragging(true);
     document.body.style.cursor = 'grabbing';
-  }, [onSelect, cameraLocked]);
-
-  const handlePointerUp = useCallback((e: ThreeEvent<PointerEvent>) => {
-    (e.target as unknown as { releasePointerCapture?: (id: number) => void })
-      .releasePointerCapture?.(e.pointerId);
-
-    setIsDragging(false);
-    document.body.style.cursor = 'auto';
-  }, []);
-
-  const handlePointerMove = useCallback((e: ThreeEvent<PointerEvent>) => {
-    if (!isDragging) return;
     
-    const now = performance.now();
-    if (now - lastUpdateRef.current < throttleMs) return;
-    lastUpdateRef.current = now;
-    
-    e.stopPropagation();
-    
-    const point = e.point;
-    if (!point) return;
+    // Add window-level event listeners for reliable dragging
+    const handleWindowMove = (evt: PointerEvent) => {
+      const now = performance.now();
+      if (now - lastUpdateRef.current < throttleMs) return;
+      lastUpdateRef.current = now;
 
-    const margin = 0.3;
-    const halfWidth = roomBounds.width / 2 - margin;
-    const halfLength = roomBounds.length / 2 - margin;
+      // Convert pointer to normalized device coordinates
+      const rect = gl.domElement.getBoundingClientRect();
+      const mouse = new THREE.Vector2(
+        ((evt.clientX - rect.left) / rect.width) * 2 - 1,
+        -((evt.clientY - rect.top) / rect.height) * 2 + 1
+      );
 
-    if (item.placementType === 'wall') {
-      const distToNorth = Math.abs(point.z - (-roomBounds.length / 2));
-      const distToSouth = Math.abs(point.z - (roomBounds.length / 2));
-      const distToWest = Math.abs(point.x - (-roomBounds.width / 2));
-      const distToEast = Math.abs(point.x - (roomBounds.width / 2));
+      raycaster.setFromCamera(mouse, camera);
       
-      const minDist = Math.min(distToNorth, distToSouth, distToWest, distToEast);
-      
-      // Allow vertical movement within wall bounds (with margin from floor and ceiling)
-      const minY = 0.2;
-      const maxY = roomBounds.height - 0.2;
-      const clampedY = Math.max(minY, Math.min(maxY, point.y));
-      
-      // Apply snap to vertical position
-      const snappedY = applySnap(clampedY, 'vertical');
-      
-      let newWall: 'north' | 'south' | 'east' | 'west';
-      let newPosition: [number, number, number];
+      if (raycaster.ray.intersectPlane(dragPlane, intersection)) {
+        const point = intersection;
+        const margin = 0.3;
+        const halfWidth = roomBounds.width / 2 - margin;
+        const halfLength = roomBounds.length / 2 - margin;
 
-      if (minDist === distToNorth) {
-        newWall = 'north';
-        const snappedX = applySnap(Math.max(-halfWidth, Math.min(halfWidth, point.x)), 'horizontal');
-        newPosition = [snappedX, snappedY, 0];
-      } else if (minDist === distToSouth) {
-        newWall = 'south';
-        const snappedX = applySnap(Math.max(-halfWidth, Math.min(halfWidth, point.x)), 'horizontal');
-        newPosition = [snappedX, snappedY, 0];
-      } else if (minDist === distToWest) {
-        newWall = 'west';
-        const snappedZ = applySnap(Math.max(-halfLength, Math.min(halfLength, point.z)), 'horizontal');
-        newPosition = [0, snappedY, snappedZ];
-      } else {
-        newWall = 'east';
-        const snappedZ = applySnap(Math.max(-halfLength, Math.min(halfLength, point.z)), 'horizontal');
-        newPosition = [0, snappedY, snappedZ];
+        if (item.placementType === 'wall') {
+          const distToNorth = Math.abs(point.z - (-roomBounds.length / 2));
+          const distToSouth = Math.abs(point.z - (roomBounds.length / 2));
+          const distToWest = Math.abs(point.x - (-roomBounds.width / 2));
+          const distToEast = Math.abs(point.x - (roomBounds.width / 2));
+          
+          const minDist = Math.min(distToNorth, distToSouth, distToWest, distToEast);
+          
+          const minY = 0.2;
+          const maxY = roomBounds.height - 0.2;
+          const clampedY = Math.max(minY, Math.min(maxY, point.y));
+          const snappedY = applySnap(clampedY, 'vertical');
+          
+          let newWall: 'north' | 'south' | 'east' | 'west';
+          let newPosition: [number, number, number];
+
+          if (minDist === distToNorth) {
+            newWall = 'north';
+            const snappedX = applySnap(Math.max(-halfWidth, Math.min(halfWidth, point.x)), 'horizontal');
+            newPosition = [snappedX, snappedY, 0];
+          } else if (minDist === distToSouth) {
+            newWall = 'south';
+            const snappedX = applySnap(Math.max(-halfWidth, Math.min(halfWidth, point.x)), 'horizontal');
+            newPosition = [snappedX, snappedY, 0];
+          } else if (minDist === distToWest) {
+            newWall = 'west';
+            const snappedZ = applySnap(Math.max(-halfLength, Math.min(halfLength, point.z)), 'horizontal');
+            newPosition = [0, snappedY, snappedZ];
+          } else {
+            newWall = 'east';
+            const snappedZ = applySnap(Math.max(-halfLength, Math.min(halfLength, point.z)), 'horizontal');
+            newPosition = [0, snappedY, snappedZ];
+          }
+
+          updateCustomModel(item.id, { position: newPosition, wall: newWall });
+        } else if (item.placementType === 'ceiling') {
+          updateCustomModel(item.id, {
+            position: [
+              Math.max(-halfWidth, Math.min(halfWidth, point.x)),
+              item.position[1],
+              Math.max(-halfLength, Math.min(halfLength, point.z))
+            ],
+          });
+        } else {
+          updateCustomModel(item.id, {
+            position: [
+              Math.max(-halfWidth, Math.min(halfWidth, point.x)),
+              0,
+              Math.max(-halfLength, Math.min(halfLength, point.z))
+            ],
+          });
+        }
       }
+    };
 
-      updateCustomModel(item.id, { position: newPosition, wall: newWall });
-    } else if (item.placementType === 'ceiling') {
-      updateCustomModel(item.id, {
-        position: [
-          Math.max(-halfWidth, Math.min(halfWidth, point.x)),
-          item.position[1],
-          Math.max(-halfLength, Math.min(halfLength, point.z))
-        ],
-      });
-    } else {
-      updateCustomModel(item.id, {
-        position: [
-          Math.max(-halfWidth, Math.min(halfWidth, point.x)),
-          0,
-          Math.max(-halfLength, Math.min(halfLength, point.z))
-        ],
-      });
-    }
-  }, [isDragging, item.id, item.placementType, item.position, roomBounds, updateCustomModel, applySnap]);
+    const handleWindowUp = () => {
+      setIsDragging(false);
+      document.body.style.cursor = 'auto';
+      window.removeEventListener('pointermove', handleWindowMove);
+      window.removeEventListener('pointerup', handleWindowUp);
+    };
+
+    window.addEventListener('pointermove', handleWindowMove);
+    window.addEventListener('pointerup', handleWindowUp);
+  }, [onSelect, cameraLocked, setupDragPlane, gl.domElement, raycaster, camera, dragPlane, intersection, roomBounds, item.placementType, item.id, item.position, updateCustomModel, applySnap]);
 
   const selectionMaterial = useMemo(() => 
     new THREE.MeshBasicMaterial({ color: "#f59e0b", transparent: true, opacity: 0.6 }), 
@@ -243,8 +267,6 @@ const CustomModelObject = ({ item, isSelected, onSelect, roomBounds }: CustomMod
       rotation={transform?.rotation}
       scale={finalScale}
       onPointerDown={handlePointerDown}
-      onPointerUp={handlePointerUp}
-      onPointerMove={handlePointerMove}
       onPointerOver={(e) => {
         e.stopPropagation();
         document.body.style.cursor = 'grab';
