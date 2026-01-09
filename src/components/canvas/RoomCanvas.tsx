@@ -5,6 +5,7 @@ import { useRoomStore, convertToMeters } from '@/store/roomStore';
 import Room from './Room';
 import FurnitureObject from './FurnitureObject';
 import CustomModelObject from './CustomModelObject';
+import SnapGuides from './SnapGuides';
 import * as THREE from 'three';
 
 const Scene = () => {
@@ -107,6 +108,9 @@ const Scene = () => {
           />
         ))}
       </Suspense>
+      {/* Snap guides on walls */}
+      <SnapGuides roomBounds={{ width, length, height }} />
+
       {/* Grid helper */}
       {showGrid && (
         <Grid
